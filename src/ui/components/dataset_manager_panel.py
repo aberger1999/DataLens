@@ -12,21 +12,23 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QIcon, QFont, QColor
+from ..theme import get_colors, RADIUS_MD, RADIUS_LG
 
 class DatasetItem(QWidget):
     """Custom widget for dataset list items."""
 
-    def __init__(self, filename, file_path, is_active=False):
+    def __init__(self, filename, file_path, is_active=False, theme="dark"):
         super().__init__()
         self.filename = filename
         self.file_path = file_path
         self.is_active = is_active
+        c = get_colors(theme)
 
-        # Set fixed height to prevent cutoff
-        self.setMinimumHeight(80)
+        self.setMinimumHeight(88)
+        self.setFixedHeight(88)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(16, 14, 16, 14)
 
         file_size = os.path.getsize(file_path)
         size_str = self.format_size(file_size)
@@ -37,38 +39,36 @@ class DatasetItem(QWidget):
         name_without_ext = filename.replace('.csv', '')
 
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(6)
+        info_layout.setSpacing(4)
         info_layout.setContentsMargins(0, 0, 0, 0)
 
         name_label = QLabel(name_without_ext)
-        name_label.setStyleSheet("font-weight: bold; font-size: 13pt; color: #1e1e1e;")
+        name_label.setStyleSheet(f"font-weight: bold; font-size: 12pt; color: {c['text_primary']}; background: transparent;")
         name_label.setWordWrap(False)
-        name_label.setFixedHeight(22)
 
-        details_label = QLabel(f"{size_str} • {time_str}")
-        details_label.setStyleSheet("color: #666; font-size: 10pt;")
-        details_label.setFixedHeight(18)
+        details_label = QLabel(f"{size_str}  ·  {time_str}")
+        details_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9pt; background: transparent;")
 
         info_layout.addWidget(name_label)
         info_layout.addWidget(details_label)
-        info_layout.addStretch()
 
         layout.addLayout(info_layout, 1)
 
         self.menu_btn = QPushButton("⋮")
         self.menu_btn.setFixedSize(36, 36)
-        self.menu_btn.setStyleSheet("""
-            QPushButton {
+        self.menu_btn.setStyleSheet(f"""
+            QPushButton {{
                 background-color: transparent;
                 border: none;
-                font-size: 20pt;
-                color: #666;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
+                font-size: 16pt;
+                font-weight: bold;
+                color: {c['text_secondary']};
+            }}
+            QPushButton:hover {{
+                background-color: {c['bg_hover']};
                 border-radius: 6px;
-                color: #333;
-            }
+                color: {c['text_primary']};
+            }}
         """)
         layout.addWidget(self.menu_btn, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -93,108 +93,86 @@ class DatasetManagerDialog(QDialog):
         self.current_dataset = "workspace_data.csv"
         self.init_ui()
 
+    def _get_theme(self):
+        """Get the current theme from the app palette heuristic."""
+        from PyQt5.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            bg = app.palette().color(app.palette().ColorRole.Window)
+            return "dark" if bg.lightness() < 128 else "light"
+        return "dark"
+
     def init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("Dataset Manager")
         self.setModal(True)
-        self.setMinimumSize(750, 550)
+        self.setMinimumSize(700, 500)
 
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f5f5f5;
-            }
-        """)
+        c = get_colors(self._get_theme())
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(20)
+        layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
 
-        header = QLabel("📊 Dataset Manager")
-        header.setStyleSheet("font-size: 18pt; font-weight: bold; color: #1e1e1e;")
+        header = QLabel("Dataset Manager")
+        header.setStyleSheet(f"font-size: 16pt; font-weight: bold; color: {c['text_primary']};")
         layout.addWidget(header)
 
         self.dataset_list = QListWidget()
         self.dataset_list.setSpacing(4)
-        self.dataset_list.setStyleSheet("""
-            QListWidget {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                padding: 8px;
+        self.dataset_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_subtle']};
+                border-radius: {RADIUS_MD};
+                padding: 6px;
                 outline: none;
-            }
-            QListWidget::item {
-                background-color: white;
-                border: 1px solid #e0e0e0;
+            }}
+            QListWidget::item {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_subtle']};
                 border-radius: 6px;
                 padding: 0px;
-                margin: 4px;
-                min-height: 80px;
-            }
-            QListWidget::item:hover {
-                background-color: #f8f8f8;
-                border: 1px solid #ccc;
-            }
-            QListWidget::item:selected {
-                background-color: #e3f2fd;
-                border: 2px solid #2196F3;
-            }
+                margin: 3px;
+                min-height: 88px;
+            }}
+            QListWidget::item:hover {{
+                background-color: {c['bg_hover']};
+                border: 1px solid {c['border']};
+            }}
+            QListWidget::item:selected {{
+                background-color: {c['accent_subtle']};
+                border: 2px solid {c['accent']};
+            }}
         """)
         self.dataset_list.itemDoubleClicked.connect(self.load_selected_dataset)
         layout.addWidget(self.dataset_list)
 
         button_layout = QHBoxLayout()
-        button_layout.setSpacing(12)
+        button_layout.setSpacing(10)
 
-        self.import_btn = QPushButton("📁 Import Dataset")
+        self.import_btn = QPushButton("Import Dataset")
+        self.import_btn.setProperty("cssClass", "primary")
         self.import_btn.clicked.connect(self.import_dataset)
-        self.import_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 14px 28px;
-                font-size: 12pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-        """)
 
-        self.load_btn = QPushButton("✓ Load Selected")
+        self.load_btn = QPushButton("Load Selected")
         self.load_btn.clicked.connect(self.load_selected_dataset)
-        self.load_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
+        self.load_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['success']};
+                color: {c['text_inverse']};
                 border: none;
-                border-radius: 6px;
-                padding: 14px 28px;
-                font-size: 12pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
+                border-radius: {RADIUS_MD};
+                padding: 10px 24px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: #059669;
+            }}
         """)
 
         self.close_btn = QPushButton("Close")
         self.close_btn.clicked.connect(self.accept)
-        self.close_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #757575;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 14px 28px;
-                font-size: 12pt;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-            }
-        """)
 
         button_layout.addWidget(self.import_btn)
         button_layout.addWidget(self.load_btn)
@@ -227,16 +205,17 @@ class DatasetManagerDialog(QDialog):
         csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
         csv_files.sort()
 
+        theme = self._get_theme()
         for filename in csv_files:
             file_path = os.path.join(data_folder, filename)
             is_active = (filename == self.current_dataset)
 
             item = QListWidgetItem(self.dataset_list)
-            widget = DatasetItem(filename, file_path, is_active)
+            widget = DatasetItem(filename, file_path, is_active, theme)
 
             widget.menu_btn.clicked.connect(lambda checked, f=filename: self.show_context_menu(f))
 
-            item.setSizeHint(widget.sizeHint())
+            item.setSizeHint(QSize(widget.sizeHint().width(), 92))
             self.dataset_list.addItem(item)
             self.dataset_list.setItemWidget(item, widget)
 
@@ -245,24 +224,25 @@ class DatasetManagerDialog(QDialog):
 
     def show_context_menu(self, filename):
         """Show context menu for dataset actions."""
+        c = get_colors(self._get_theme())
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: white;
-                border: 1px solid #ccc;
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border']};
                 border-radius: 6px;
-                padding: 6px;
-            }
-            QMenu::item {
-                padding: 10px 28px;
-                color: #1e1e1e;
-                font-size: 11pt;
+                padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 8px 24px;
+                color: {c['text_primary']};
+                font-size: 10pt;
                 border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #2196F3;
-                color: white;
-            }
+            }}
+            QMenu::item:selected {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+            }}
         """)
 
         rename_action = menu.addAction("✏️ Rename")

@@ -18,6 +18,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import seaborn as sns
 import jinja2
 import os
+import tempfile
 
 try:
     from weasyprint import HTML
@@ -33,9 +34,13 @@ class ReportGeneratorPanel(QWidget):
         super().__init__()
         self.data_manager = data_manager
         self.workspace_path = None
+        # Use absolute path relative to project root for template loading
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        template_dir = os.path.join(project_root, "templates")
         self.template_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader("templates")
+            loader=jinja2.FileSystemLoader(template_dir)
         )
+        self._temp_files = []  # Track temp files for cleanup
         self.init_ui()
         self.setup_connections()
         
@@ -199,12 +204,15 @@ class ReportGeneratorPanel(QWidget):
             plt.title('Correlation Heatmap')
             
             # Save plot to temporary file
-            plt.savefig('temp_corr.png')
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            tmp.close()
+            plt.savefig(tmp.name)
             plt.close()
-            
+            self._temp_files.append(tmp.name)
+
             return {
                 "correlation_matrix": corr_matrix.to_html(),
-                "heatmap_path": 'temp_corr.png'
+                "heatmap_path": tmp.name
             }
         return None
         
@@ -221,10 +229,12 @@ class ReportGeneratorPanel(QWidget):
             plt.figure(figsize=(10, 6))
             sns.histplot(data=df, x=col, kde=True)
             plt.title(f'Distribution of {col}')
-            filename = f'temp_dist_{col}.png'.replace('/', '_')
-            plt.savefig(filename)
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            tmp.close()
+            plt.savefig(tmp.name)
             plt.close()
-            distributions[col] = filename
+            self._temp_files.append(tmp.name)
+            distributions[col] = tmp.name
             
         return distributions
         
@@ -246,10 +256,12 @@ class ReportGeneratorPanel(QWidget):
                     plt.plot(df[dt_col], df[num_col])
                     plt.title(f'{num_col} over Time')
                     plt.xticks(rotation=45)
-                    filename = f'temp_ts_{num_col}.png'.replace('/', '_')
-                    plt.savefig(filename)
+                    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                    tmp.close()
+                    plt.savefig(tmp.name)
                     plt.close()
-                    time_series_plots[num_col] = filename
+                    self._temp_files.append(tmp.name)
+                    time_series_plots[num_col] = tmp.name
                     
             return time_series_plots
         return None
@@ -264,7 +276,9 @@ class ReportGeneratorPanel(QWidget):
         if self.data_manager.data is None:
             QMessageBox.warning(self, "Warning", "No data loaded.")
             return
-            
+
+        self.cleanup_temp_files()
+
         try:
             report_data = {
                 "title": self.title_edit.text(),
@@ -389,6 +403,16 @@ class ReportGeneratorPanel(QWidget):
                 "Error",
                 f"Error exporting HTML: {str(e)}"
             )
+
+    def cleanup_temp_files(self):
+        """Remove all tracked temporary files."""
+        for path in self._temp_files:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError:
+                pass
+        self._temp_files.clear()
 
     def set_workspace_path(self, workspace_path):
         """Set the active workspace path."""

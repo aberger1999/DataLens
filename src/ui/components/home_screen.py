@@ -3,13 +3,14 @@ Modern home screen for workspace selection and settings.
 """
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QGridLayout, QScrollArea,
     QDialog, QLineEdit, QMessageBox, QGroupBox,
     QComboBox, QCheckBox, QSpinBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
+from ..theme import get_colors, RADIUS_LG, RADIUS_MD
 import os
 import json
 from datetime import datetime
@@ -29,113 +30,109 @@ class WorkspaceCard(QFrame):
         self.init_ui()
 
     def init_ui(self):
+        c = get_colors(self.current_theme)
+
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(180)
-        self.setMaximumWidth(300)
+        self.setMinimumHeight(200)
+        self.setMaximumWidth(320)
         self.update_theme()
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
 
+        # Top row: icon + action buttons
         top_layout = QHBoxLayout()
 
         icon_label = QLabel("📁")
-        icon_label.setStyleSheet("font-size: 48px;")
+        icon_label.setStyleSheet("font-size: 36px; background: transparent;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_layout.addWidget(icon_label)
 
         top_layout.addStretch()
 
         rename_btn = QPushButton("✏️")
-        rename_btn.setFixedSize(30, 30)
-        rename_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2a82da;
+        rename_btn.setFixedSize(34, 34)
+        rename_btn.setToolTip("Rename workspace")
+        rename_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['accent']};
                 border: none;
-                border-radius: 15px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #3b92ea;
-            }
+                border-radius: 17px;
+                font-size: 16px;
+                padding: 0px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['accent_hover']};
+            }}
         """)
         rename_btn.clicked.connect(lambda: self.renamed.emit(self.workspace_id))
         top_layout.addWidget(rename_btn)
 
         delete_btn = QPushButton("🗑️")
-        delete_btn.setFixedSize(30, 30)
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #dc2626;
+        delete_btn.setFixedSize(34, 34)
+        delete_btn.setToolTip("Delete workspace")
+        delete_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['danger']};
                 border: none;
-                border-radius: 15px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #ef4444;
-            }
+                border-radius: 17px;
+                font-size: 16px;
+                padding: 0px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['danger_hover']};
+            }}
         """)
         delete_btn.clicked.connect(lambda: self.deleted.emit(self.workspace_id))
         top_layout.addWidget(delete_btn)
 
         layout.addLayout(top_layout)
 
+        # Workspace name
         name_label = QLabel(self.workspace_data.get('name', f'Workspace {self.workspace_id}'))
         name_font = QFont()
         name_font.setPointSize(14)
         name_font.setBold(True)
         name_label.setFont(name_font)
         name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_label.setStyleSheet("background: transparent;")
         layout.addWidget(name_label)
 
+        # Stats
         stats_text = (
-            f"{self.workspace_data.get('file_count', 0)} files • "
-            f"{self.workspace_data.get('graph_count', 0)} graphs • "
+            f"{self.workspace_data.get('file_count', 0)} files  ·  "
+            f"{self.workspace_data.get('graph_count', 0)} graphs  ·  "
             f"{self.workspace_data.get('report_count', 0)} reports"
         )
         stats_label = QLabel(stats_text)
-        stats_label.setStyleSheet("color: #aaaaaa; font-size: 10pt;")
+        stats_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9pt; background: transparent;")
         stats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(stats_label)
 
         if self.workspace_data.get('last_modified'):
             date_label = QLabel(f"Modified: {self.workspace_data['last_modified']}")
-            date_label.setStyleSheet("color: #888888; font-size: 9pt;")
+            date_label.setStyleSheet(f"color: {c['text_disabled']}; font-size: 8pt; background: transparent;")
             date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(date_label)
 
         layout.addStretch()
 
     def update_theme(self):
-        is_dark = self.current_theme.lower() == "dark"
-
-        if is_dark:
-            self.setStyleSheet("""
-                WorkspaceCard {
-                    background-color: #2d2d2d;
-                    border: 2px solid #555555;
-                    border-radius: 12px;
-                    padding: 20px;
-                }
-                WorkspaceCard:hover {
-                    background-color: #3d3d3d;
-                    border: 2px solid #2a82da;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                WorkspaceCard {
-                    background-color: #ffffff;
-                    border: 2px solid #cccccc;
-                    border-radius: 12px;
-                    padding: 20px;
-                }
-                WorkspaceCard:hover {
-                    background-color: #f5f5f5;
-                    border: 2px solid #2a82da;
-                }
-            """)
+        c = get_colors(self.current_theme)
+        self.setStyleSheet(f"""
+            WorkspaceCard {{
+                background-color: {c['bg_secondary']};
+                border: 1px solid {c['border_subtle']};
+                border-radius: {RADIUS_LG};
+                padding: 20px;
+            }}
+            WorkspaceCard:hover {{
+                background-color: {c['bg_tertiary']};
+                border: 1px solid {c['accent']};
+            }}
+        """)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -153,58 +150,46 @@ class CreateWorkspaceCard(QFrame):
         self.init_ui()
         
     def init_ui(self):
+        c = get_colors(self.current_theme)
+
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(180)
-        self.setMaximumWidth(300)
+        self.setMinimumHeight(200)
+        self.setMaximumWidth(320)
         self.update_theme()
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(20, 20, 20, 20)
 
         icon_label = QLabel("➕")
-        icon_label.setStyleSheet("font-size: 64px;")
+        icon_label.setStyleSheet("font-size: 48px; background: transparent;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
 
         text_label = QLabel("Create New Workspace")
         text_font = QFont()
-        text_font.setPointSize(12)
+        text_font.setPointSize(11)
         text_font.setBold(True)
         text_label.setFont(text_font)
         text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text_label.setStyleSheet("background: transparent;")
         layout.addWidget(text_label)
 
     def update_theme(self):
-        palette = self.palette()
-        is_dark = self.current_theme.lower() == "dark"
-
-        if is_dark:
-            self.setStyleSheet("""
-                CreateWorkspaceCard {
-                    background-color: #1e1e1e;
-                    border: 2px dashed #555555;
-                    border-radius: 12px;
-                    padding: 20px;
-                }
-                CreateWorkspaceCard:hover {
-                    background-color: #2d2d2d;
-                    border: 2px dashed #2a82da;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                CreateWorkspaceCard {
-                    background-color: #fafafa;
-                    border: 2px dashed #cccccc;
-                    border-radius: 12px;
-                    padding: 20px;
-                }
-                CreateWorkspaceCard:hover {
-                    background-color: #f0f0f0;
-                    border: 2px dashed #2a82da;
-                }
-            """)
+        c = get_colors(self.current_theme)
+        self.setStyleSheet(f"""
+            CreateWorkspaceCard {{
+                background-color: {c['bg_primary']};
+                border: 2px dashed {c['border']};
+                border-radius: {RADIUS_LG};
+                padding: 20px;
+            }}
+            CreateWorkspaceCard:hover {{
+                background-color: {c['bg_secondary']};
+                border: 2px dashed {c['accent']};
+            }}
+        """)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -213,48 +198,54 @@ class CreateWorkspaceCard(QFrame):
 
 class CreateWorkspaceDialog(QDialog):
     """Dialog for creating a new workspace."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.workspace_name = ""
         self.init_ui()
-        
+
     def init_ui(self):
         self.setWindowTitle("Create New Workspace")
-        self.setMinimumWidth(400)
-        
+        self.setMinimumWidth(440)
+
         layout = QVBoxLayout(self)
-        
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
+
         title_label = QLabel("Create New Workspace")
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
         title_label.setFont(title_font)
         layout.addWidget(title_label)
-        
+
         desc_label = QLabel("Enter a name for your new workspace:")
-        desc_label.setStyleSheet("color: #aaaaaa; margin-bottom: 10px;")
         layout.addWidget(desc_label)
-        
+
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Sales Analysis, Customer Data, etc.")
-        self.name_input.setStyleSheet("padding: 8px; font-size: 11pt;")
+        self.name_input.setMinimumHeight(36)
         layout.addWidget(self.name_input)
-        
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setAutoDefault(False)
         button_layout.addWidget(cancel_btn)
-        
+
         create_btn = QPushButton("Create Workspace")
-        create_btn.setStyleSheet("background-color: #2a82da; font-weight: bold;")
+        create_btn.setProperty("cssClass", "primary")
         create_btn.clicked.connect(self.accept)
+        create_btn.setDefault(True)
         button_layout.addWidget(create_btn)
-        
+
         layout.addLayout(button_layout)
-        
+
+        # Enter key in the input creates the workspace
+        self.name_input.returnPressed.connect(self.accept)
+
     def get_workspace_name(self):
         return self.name_input.text().strip()
 
@@ -269,9 +260,11 @@ class RenameWorkspaceDialog(QDialog):
 
     def init_ui(self):
         self.setWindowTitle("Rename Workspace")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(440)
 
         layout = QVBoxLayout(self)
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
 
         title_label = QLabel("Rename Workspace")
         title_font = QFont()
@@ -281,13 +274,12 @@ class RenameWorkspaceDialog(QDialog):
         layout.addWidget(title_label)
 
         desc_label = QLabel("Enter a new name for your workspace:")
-        desc_label.setStyleSheet("color: #aaaaaa; margin-bottom: 10px;")
         layout.addWidget(desc_label)
 
         self.name_input = QLineEdit()
         self.name_input.setText(self.current_name)
         self.name_input.setPlaceholderText("e.g., Sales Analysis, Customer Data, etc.")
-        self.name_input.setStyleSheet("padding: 8px; font-size: 11pt;")
+        self.name_input.setMinimumHeight(36)
         self.name_input.selectAll()
         layout.addWidget(self.name_input)
 
@@ -296,14 +288,18 @@ class RenameWorkspaceDialog(QDialog):
 
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setAutoDefault(False)
         button_layout.addWidget(cancel_btn)
 
         rename_btn = QPushButton("Rename")
-        rename_btn.setStyleSheet("background-color: #2a82da; font-weight: bold;")
+        rename_btn.setProperty("cssClass", "primary")
         rename_btn.clicked.connect(self.accept)
+        rename_btn.setDefault(True)
         button_layout.addWidget(rename_btn)
 
         layout.addLayout(button_layout)
+
+        self.name_input.returnPressed.connect(self.accept)
 
     def get_workspace_name(self):
         return self.name_input.text().strip()
@@ -311,95 +307,97 @@ class RenameWorkspaceDialog(QDialog):
 
 class SettingsDialog(QDialog):
     """Dialog for application settings."""
-    
+
     theme_changed = pyqtSignal(str)
-    
+
     def __init__(self, parent=None, current_theme="dark"):
         super().__init__(parent)
         self.current_theme = current_theme
         self.init_ui()
-        
+
     def init_ui(self):
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(400)
-        
+        self.setMinimumWidth(480)
+        self.setMinimumHeight(380)
+
         layout = QVBoxLayout(self)
-        
-        title_label = QLabel("⚙️ Settings")
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        title_label = QLabel("Settings")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         title_label.setFont(title_font)
         layout.addWidget(title_label)
-        
+
         appearance_group = QGroupBox("Appearance")
         appearance_layout = QVBoxLayout(appearance_group)
-        
+
         theme_layout = QHBoxLayout()
         theme_label = QLabel("Theme:")
         theme_layout.addWidget(theme_label)
-        
+
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["Dark", "Light"])
         self.theme_combo.setCurrentText(self.current_theme.capitalize())
         self.theme_combo.currentTextChanged.connect(self.on_theme_changed)
         theme_layout.addWidget(self.theme_combo)
         theme_layout.addStretch()
-        
+
         appearance_layout.addLayout(theme_layout)
         layout.addWidget(appearance_group)
-        
+
         data_group = QGroupBox("Data Settings")
         data_layout = QVBoxLayout(data_group)
-        
+
         auto_save_layout = QHBoxLayout()
         self.auto_save_check = QCheckBox("Auto-save data on changes")
         self.auto_save_check.setChecked(True)
         auto_save_layout.addWidget(self.auto_save_check)
         data_layout.addLayout(auto_save_layout)
-        
+
         decimal_layout = QHBoxLayout()
         decimal_label = QLabel("Decimal places:")
         decimal_layout.addWidget(decimal_label)
-        
+
         self.decimal_spin = QSpinBox()
         self.decimal_spin.setRange(0, 10)
         self.decimal_spin.setValue(2)
         decimal_layout.addWidget(self.decimal_spin)
         decimal_layout.addStretch()
-        
+
         data_layout.addLayout(decimal_layout)
         layout.addWidget(data_group)
-        
+
         visualization_group = QGroupBox("Visualization Settings")
         viz_layout = QVBoxLayout(visualization_group)
-        
+
         dpi_layout = QHBoxLayout()
         dpi_label = QLabel("Export DPI:")
         dpi_layout.addWidget(dpi_label)
-        
+
         self.dpi_combo = QComboBox()
         self.dpi_combo.addItems(["150", "300", "600"])
         self.dpi_combo.setCurrentText("300")
         dpi_layout.addWidget(self.dpi_combo)
         dpi_layout.addStretch()
-        
+
         viz_layout.addLayout(dpi_layout)
         layout.addWidget(visualization_group)
-        
+
         layout.addStretch()
-        
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         close_btn = QPushButton("Close")
+        close_btn.setProperty("cssClass", "primary")
         close_btn.clicked.connect(self.accept)
-        close_btn.setStyleSheet("background-color: #2a82da; font-weight: bold; padding: 8px 20px;")
         button_layout.addWidget(close_btn)
-        
+
         layout.addLayout(button_layout)
-        
+
     def on_theme_changed(self, theme):
         self.theme_changed.emit(theme.lower())
 
@@ -458,57 +456,64 @@ class HomeScreen(QWidget):
     def init_ui(self):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(30)
+        layout.setContentsMargins(48, 40, 48, 40)
+        layout.setSpacing(24)
 
+        # Header
         header_layout = QHBoxLayout()
 
         title_layout = QVBoxLayout()
-        title_label = QLabel("📊 Data Analysis Application")
+        title_layout.setSpacing(6)
+        title_label = QLabel("Data Analysis Application")
         title_font = QFont()
-        title_font.setPointSize(24)
+        title_font.setPointSize(22)
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_layout.addWidget(title_label)
 
         self.subtitle_label = QLabel("Select a workspace to begin your analysis")
-        self.subtitle_label.setStyleSheet("color: #aaaaaa; font-size: 12pt;")
+        subtitle_font = QFont()
+        subtitle_font.setPointSize(11)
+        self.subtitle_label.setFont(subtitle_font)
         title_layout.addWidget(self.subtitle_label)
 
         header_layout.addLayout(title_layout)
         header_layout.addStretch()
 
-        self.settings_btn = QPushButton("⚙️ Settings")
+        self.settings_btn = QPushButton("Settings")
         self.settings_btn.clicked.connect(self.show_settings)
         header_layout.addWidget(self.settings_btn)
 
         layout.addLayout(header_layout)
 
+        # Separator
         self.separator = QFrame()
         self.separator.setFrameShape(QFrame.Shape.HLine)
-        self.separator.setStyleSheet("background-color: #555555;")
+        self.separator.setFixedHeight(1)
         layout.addWidget(self.separator)
 
+        # Workspaces section header
         workspaces_header_layout = QHBoxLayout()
 
         workspaces_label = QLabel("Your Workspaces")
         workspaces_font = QFont()
-        workspaces_font.setPointSize(14)
+        workspaces_font.setPointSize(13)
         workspaces_font.setBold(True)
         workspaces_label.setFont(workspaces_font)
         workspaces_header_layout.addWidget(workspaces_label)
 
         workspaces_header_layout.addStretch()
 
-        self.create_workspace_btn = QPushButton("➕ Create Workspace")
+        self.create_workspace_btn = QPushButton("+ New Workspace")
+        self.create_workspace_btn.setProperty("cssClass", "primary")
         self.create_workspace_btn.clicked.connect(self.create_new_workspace)
         workspaces_header_layout.addWidget(self.create_workspace_btn)
 
         layout.addLayout(workspaces_header_layout)
 
+        # Scrollable workspace grid
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("QScrollArea { border: none; }")
 
         self.workspaces_container = QWidget()
         self.workspaces_layout = QGridLayout(self.workspaces_container)
@@ -522,67 +527,39 @@ class HomeScreen(QWidget):
 
     def update_home_theme(self):
         """Update theme for home screen elements."""
-        is_dark = self.current_theme.lower() == "dark"
+        c = get_colors(self.current_theme)
 
-        if is_dark:
-            self.subtitle_label.setStyleSheet("color: #aaaaaa; font-size: 12pt;")
-            self.separator.setStyleSheet("background-color: #555555;")
-            self.settings_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2d2d2d;
-                    border: 1px solid #555555;
-                    border-radius: 8px;
-                    padding: 10px 20px;
-                    font-size: 11pt;
-                }
-                QPushButton:hover {
-                    background-color: #3d3d3d;
-                    border: 1px solid #2a82da;
-                }
-            """)
-            self.create_workspace_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2a82da;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 10px 20px;
-                    font-size: 11pt;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #3a92ea;
-                }
-            """)
-        else:
-            self.subtitle_label.setStyleSheet("color: #666666; font-size: 12pt;")
-            self.separator.setStyleSheet("background-color: #cccccc;")
-            self.settings_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #e0e0e0;
-                    border: 1px solid #aaaaaa;
-                    border-radius: 8px;
-                    padding: 10px 20px;
-                    font-size: 11pt;
-                }
-                QPushButton:hover {
-                    background-color: #d0d0d0;
-                    border: 1px solid #2a82da;
-                }
-            """)
-            self.create_workspace_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2a82da;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 10px 20px;
-                    font-size: 11pt;
-                    font-weight: bold;
-                    color: #ffffff;
-                }
-                QPushButton:hover {
-                    background-color: #3a92ea;
-                }
-            """)
+        self.subtitle_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 11pt;")
+        self.separator.setStyleSheet(f"background-color: {c['border_subtle']};")
+
+        self.settings_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['bg_tertiary']};
+                border: 1px solid {c['border']};
+                border-radius: {RADIUS_MD};
+                padding: 10px 20px;
+                font-size: 10pt;
+            }}
+            QPushButton:hover {{
+                background-color: {c['bg_hover']};
+                border-color: {c['accent']};
+            }}
+        """)
+
+        self.create_workspace_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+                border: none;
+                border-radius: {RADIUS_MD};
+                padding: 10px 24px;
+                font-size: 10pt;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {c['accent_hover']};
+            }}
+        """)
 
     def load_workspaces(self):
         """Load and display all workspaces."""
@@ -638,8 +615,9 @@ class HomeScreen(QWidget):
                     row += 1
 
         if len(self.workspaces) == 0:
-            empty_label = QLabel("No workspaces yet. Click 'Create Workspace' to get started!")
-            empty_label.setStyleSheet("color: #aaaaaa; font-size: 12pt; padding: 40px;")
+            c = get_colors(self.current_theme)
+            empty_label = QLabel("No workspaces yet. Click '+ New Workspace' to get started!")
+            empty_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 11pt; padding: 40px;")
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.workspaces_layout.addWidget(empty_label, 0, 0, 1, 3)
 

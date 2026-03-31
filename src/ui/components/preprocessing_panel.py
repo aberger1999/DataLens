@@ -8,9 +8,10 @@ from PyQt5.QtWidgets import (
     QGridLayout, QTabWidget, QLineEdit, QCheckBox,
     QTableWidget, QTableWidgetItem, QMessageBox,
     QScrollArea, QGroupBox, QProgressDialog, QApplication,
-    QMenu, QInputDialog
+    QMenu, QInputDialog, QShortcut
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtGui import QKeySequence
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -244,10 +245,14 @@ class PreprocessingPanel(QWidget):
         
         # Create main data view for transform tab
         self.data_view = QTableWidget()
+        self.data_view.setAlternatingRowColors(True)
         self.data_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.data_view.customContextMenuRequested.connect(self.show_context_menu)
         # Make cells not editable
         self.data_view.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        # Ctrl+C shortcut for copying
+        copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self.data_view)
+        copy_shortcut.activated.connect(self._copy_data_view_selection)
         
         # Add pagination controls and Apply Changes button
         pagination = QHBoxLayout()
@@ -840,16 +845,24 @@ class PreprocessingPanel(QWidget):
         self.data_view.setRowCount(len(page_data))
         self.data_view.setColumnCount(len(df.columns))
         self.data_view.setHorizontalHeaderLabels(df.columns)
-        
+
         # Set vertical header labels to start from 1 instead of 0
         self.data_view.setVerticalHeaderLabels([str(i + 1) for i in range(start_idx, end_idx)])
-        
-        for i in range(len(page_data)):
-            for j in range(len(df.columns)):
-                value = str(page_data.iloc[i, j])
-                self.data_view.setItem(i, j, QTableWidgetItem(value))
-                
-        self.data_view.resizeColumnsToContents()
+
+        self.data_view.setUpdatesEnabled(False)
+        try:
+            for i in range(len(page_data)):
+                for j in range(len(df.columns)):
+                    value = str(page_data.iloc[i, j])
+                    self.data_view.setItem(i, j, QTableWidgetItem(value))
+        finally:
+            self.data_view.setUpdatesEnabled(True)
+
+        # Use interactive resize instead of expensive resizeColumnsToContents
+        from PyQt5.QtWidgets import QHeaderView
+        header = self.data_view.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setDefaultSectionSize(120)
         
         # Update the data type dropdown to reflect the currently selected column
         self.update_dtype_dropdown()
@@ -1077,92 +1090,7 @@ class PreprocessingPanel(QWidget):
         # Update undo/redo buttons state
         self.update_undo_redo_buttons()
 
-    def update_missing_values_info(self):
-        """Update the missing values information table."""
-        # This method is no longer used in the new UI design
-        pass
-        
-    def update_transform_columns_table(self):
-        """Update the transformation columns table."""
-        # This method is no longer used in the new UI design
-        pass
 
-    def apply_transformation(self):
-        """Apply the selected transformation to the selected columns."""
-        if self.data_manager.data is None:
-            return
-            
-        progress = QProgressDialog("Applying transformation...", "Cancel", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.show()
-        
-        try:
-            df = self.data_manager.data.copy()
-            method = self.transform_combo.currentText()
-            
-            progress.setValue(20)
-            
-            # Get selected columns
-            selected_columns = []
-            for i in range(self.transform_columns_table.rowCount()):
-                checkbox = self.transform_columns_table.cellWidget(i, 1)
-                if checkbox.isChecked():
-                    column = self.transform_columns_table.item(i, 0).text()
-                    selected_columns.append(column)
-                    
-            if not selected_columns:
-                QMessageBox.warning(self, "Warning", "Please select at least one column to transform.")
-                return
-                
-            progress.setValue(40)
-            
-            # Apply transformation
-            if method == "Standard Scale":
-                scaler = StandardScaler()
-                df[selected_columns] = scaler.fit_transform(df[selected_columns])
-            elif method == "Min-Max Scale":
-                scaler = MinMaxScaler()
-                df[selected_columns] = scaler.fit_transform(df[selected_columns])
-            elif method == "Robust Scale":
-                scaler = RobustScaler()
-                df[selected_columns] = scaler.fit_transform(df[selected_columns])
-            elif method == "Log Transform":
-                for col in selected_columns:
-                    if (df[col] <= 0).any():
-                        QMessageBox.warning(self, "Warning", 
-                                         f"Column {col} contains non-positive values. "
-                                         "Log transform requires positive values.")
-                        continue
-                    df[col] = np.log(df[col])
-            elif method == "Square Root":
-                for col in selected_columns:
-                    if (df[col] < 0).any():
-                        QMessageBox.warning(self, "Warning",
-                                         f"Column {col} contains negative values. "
-                                         "Square root transform requires non-negative values.")
-                        continue
-                    df[col] = np.sqrt(df[col])
-            elif method == "Box-Cox":
-                for col in selected_columns:
-                    if (df[col] <= 0).any():
-                        QMessageBox.warning(self, "Warning",
-                                         f"Column {col} contains non-positive values. "
-                                         "Box-Cox transform requires positive values.")
-                        continue
-                    df[col] = stats.boxcox(df[col])[0]
-                    
-            progress.setValue(80)
-            
-            self.data_manager._data = df
-            QTimer.singleShot(100, lambda: self.data_manager.data_loaded.emit(df))
-            
-            progress.setValue(100)
-            QMessageBox.information(self, "Success", "Transformation applied successfully!")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying transformation: {str(e)}")
-        finally:
-            progress.close()
 
     def save_state(self):
         """Save current state to history."""
@@ -1189,23 +1117,6 @@ class PreprocessingPanel(QWidget):
         # Update undo/redo buttons
         self.update_undo_redo_buttons()
 
-    def apply_operation(self, operation_func):
-        """Apply an operation with proper state management."""
-        try:
-            # Save current state before operation
-            if self.data_manager.data is not None:
-                self.save_state()
-            
-            # Apply the operation
-            operation_func()
-            
-        except Exception as e:
-            # Restore previous state if operation fails
-            if self.history:
-                self.data_manager._data = self.history[-1]
-                self.data_manager.data_loaded.emit(self.history[-1])
-            QMessageBox.critical(self, "Error", str(e))
-            
     def export_to_csv(self):
         """Export the current dataset to a CSV file."""
         if self.data_manager.data is None:
@@ -1258,33 +1169,6 @@ class PreprocessingPanel(QWidget):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error changing data type: {str(e)}")
-
-    def find_and_replace(self):
-        """Implement the find and replace functionality."""
-        if not self.check_data_loaded():
-            return
-            
-        find_value = self.find_edit.text().strip()
-        replace_value = self.replace_edit.text()
-        
-        try:
-            df = self.data_manager.data.copy()
-            
-            # Apply find and replace to all columns
-            for column in df.columns:
-                df[column] = df[column].astype(str).replace(find_value, replace_value)
-            
-            self.save_state()
-            self.data_manager._data = df
-            self.data_manager.data_loaded.emit(df)
-            
-            QMessageBox.information(self, "Success", 
-                                  f"Replaced all occurrences of '{find_value}' "
-                                  f"with '{replace_value}'")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Error", 
-                               f"Error during find and replace: {str(e)}")
 
     def update_outlier_view(self):
         """Update the outlier table view based on current filters."""
@@ -1356,7 +1240,10 @@ class PreprocessingPanel(QWidget):
                 return
                 
             progress.setValue(20)
-            
+
+            lower_bound = None
+            upper_bound = None
+
             # Calculate statistics based on the entire dataset
             if method == "IQR Method":
                 Q1 = np.percentile(data, 25)
@@ -1400,8 +1287,8 @@ class PreprocessingPanel(QWidget):
                 'total_outliers': total_outliers,
                 'total_rows': len(data),
                 'bounds': {
-                    'lower': lower_bound if method == "IQR Method" else None,
-                    'upper': upper_bound if method == "IQR Method" else None,
+                    'lower': lower_bound,
+                    'upper': upper_bound,
                     'threshold': threshold,
                     'method': method
                 }
@@ -1870,10 +1757,10 @@ class PreprocessingPanel(QWidget):
 
         try:
             self.save_state()
-            df = self.data_manager.data
+            df = self.data_manager.data.copy()
 
             if column == "All Columns":
-                cols = df.columns
+                cols = df.columns.tolist()
             else:
                 cols = [column]
 
@@ -1882,23 +1769,24 @@ class PreprocessingPanel(QWidget):
                     df.dropna(subset=[col], inplace=True)
                 elif action == "Fill with Mean":
                     if pd.api.types.is_numeric_dtype(df[col]):
-                        df[col].fillna(df[col].mean(), inplace=True)
+                        df[col] = df[col].fillna(df[col].mean())
                 elif action == "Fill with Median":
                     if pd.api.types.is_numeric_dtype(df[col]):
-                        df[col].fillna(df[col].median(), inplace=True)
+                        df[col] = df[col].fillna(df[col].median())
                 elif action == "Fill with Mode":
                     if not df[col].mode().empty:
-                        df[col].fillna(df[col].mode()[0], inplace=True)
+                        df[col] = df[col].fillna(df[col].mode()[0])
                 elif action == "Fill with 0":
                     if pd.api.types.is_numeric_dtype(df[col]):
-                        df[col].fillna(0, inplace=True)
+                        df[col] = df[col].fillna(0)
                 elif action == "Forward Fill":
-                    df[col].fillna(method='ffill', inplace=True)
+                    df[col] = df[col].ffill()
                 elif action == "Backward Fill":
-                    df[col].fillna(method='bfill', inplace=True)
+                    df[col] = df[col].bfill()
 
+            self.data_manager._data = df
             self.update_data_view()
-            self.preprocessing_complete.emit()
+            self.data_manager.data_loaded.emit(df)
             self.data_modified.emit()
             QMessageBox.information(self, "Success", f"Missing values handled using '{action}'.")
 
@@ -1915,24 +1803,59 @@ class PreprocessingPanel(QWidget):
 
         try:
             self.save_state()
-            df = self.data_manager.data
+            df = self.data_manager.data.copy()
             initial_count = len(df)
 
             if action == "Remove Duplicates":
-                df.drop_duplicates(inplace=True)
+                df = df.drop_duplicates()
             elif action == "Keep First":
-                df.drop_duplicates(keep='first', inplace=True)
+                df = df.drop_duplicates(keep='first')
             elif action == "Keep Last":
-                df.drop_duplicates(keep='last', inplace=True)
+                df = df.drop_duplicates(keep='last')
 
             final_count = len(df)
             removed = initial_count - final_count
 
+            self.data_manager._data = df
             self.update_data_view()
-            self.preprocessing_complete.emit()
+            self.data_manager.data_loaded.emit(df)
             self.data_modified.emit()
             QMessageBox.information(self, "Success", f"Removed {removed} duplicate rows.")
 
         except Exception as e:
             self.undo()
-            QMessageBox.critical(self, "Error", f"Error handling duplicates: {str(e)}") 
+            QMessageBox.critical(self, "Error", f"Error handling duplicates: {str(e)}")
+
+    def _copy_data_view_selection(self):
+        """Copy selected cells from the data_view to the clipboard."""
+        selection = self.data_view.selectedRanges()
+        if not selection:
+            return
+
+        rows = set()
+        cols = set()
+        for sel_range in selection:
+            for r in range(sel_range.topRow(), sel_range.bottomRow() + 1):
+                rows.add(r)
+            for c in range(sel_range.leftColumn(), sel_range.rightColumn() + 1):
+                cols.add(c)
+
+        rows = sorted(rows)
+        cols = sorted(cols)
+
+        lines = []
+        header_parts = []
+        for c in cols:
+            header = self.data_view.horizontalHeaderItem(c)
+            header_parts.append(header.text() if header else "")
+        lines.append("\t".join(header_parts))
+
+        for r in rows:
+            parts = []
+            for c in cols:
+                item = self.data_view.item(r, c)
+                parts.append(item.text() if item else "")
+            lines.append("\t".join(parts))
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText("\n".join(lines))

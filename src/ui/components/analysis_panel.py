@@ -268,50 +268,37 @@ class AnalysisPanel(QWidget):
             
     def update_theme(self, theme_name):
         """Update the panel theme."""
-        is_dark = theme_name.lower() == "dark"
+        from ..theme import get_colors
+        c = get_colors(theme_name)
 
-        # Colors
-        bg_color = "#1e1e1e" if is_dark else "#ffffff"
-        text_color = "#ffffff" if is_dark else "#000000"
-        btn_bg = "#3a3a3a" if is_dark else "#e0e0e0"
-        btn_text = "#ffffff" if is_dark else "#000000"
-        btn_border = "#505050" if is_dark else "#cccccc"
+        self.analysis_stack.setStyleSheet(f"background-color: {c['bg_primary']};")
 
-        # Update stack widget background
-        self.analysis_stack.setStyleSheet(f"background-color: {bg_color};")
-
-        # Update buttons
         btn_style = f"""
-            QPushButton {{ background-color: {btn_bg}; color: {btn_text}; border: 1px solid {btn_border}; }}
-            QPushButton:checked {{ background-color: #4CAF50; color: white; }}
+            QPushButton {{ background-color: {c['bg_tertiary']}; color: {c['text_primary']}; border: 1px solid {c['border']}; }}
+            QPushButton:checked {{ background-color: {c['accent']}; color: {c['text_inverse']}; }}
         """
 
         self.stats_btn.setStyleSheet(btn_style)
         self.viz_btn.setStyleSheet(btn_style)
         self.corr_btn.setStyleSheet(btn_style)
 
-        # Determine table text color based on theme
-        table_text_color = "white" if is_dark else "black"
-        table_grid_color = "#3d3d3d" if is_dark else "#e0e0e0"
-
         self.results_table.setStyleSheet(f"""
             QTableWidget {{
-                background-color: {bg_color};
-                color: {table_text_color};
-                gridline-color: {table_grid_color};
-                selection-background-color: #2a82da;
-                selection-color: white;
+                background-color: {c['bg_secondary']};
+                color: {c['text_primary']};
+                gridline-color: {c['table_grid']};
+                selection-background-color: {c['accent']};
+                selection-color: {c['text_inverse']};
             }}
             QHeaderView::section {{
-                background-color: {btn_bg};
-                color: {table_text_color};
-                border: 1px solid {btn_border};
+                background-color: {c['bg_tertiary']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border_subtle']};
                 padding: 4px;
             }}
         """)
 
-        # Force chart background update if needed (matplotlib handles its own usually,
-        # but we might need to set facecolor if it was transparent or tailored for dark)
+        bg_color = c['bg_primary']
         if hasattr(self, 'figure'):
             self.figure.patch.set_facecolor(bg_color)
             if hasattr(self, 'canvas'):
@@ -364,7 +351,7 @@ class AnalysisPanel(QWidget):
             stats.append(("Basic Information", ""))
             stats.append(("Count", len(df)))
             stats.append(("Missing Values", df[column].isna().sum()))
-            stats.append(("Missing Percentage", f"{df[column].isna().sum() / len(df) * 100:.2f}%"))
+            stats.append(("Missing Percentage", f"{df[column].isna().sum() / max(len(df), 1) * 100:.2f}%"))
             stats.append(("Unique Values", df[column].nunique()))
             
             # Numeric statistics
@@ -432,7 +419,7 @@ class AnalysisPanel(QWidget):
                 for i in range(top_n):
                     value = value_counts.index[i]
                     count = value_counts.iloc[i]
-                    percentage = count / len(df) * 100
+                    percentage = count / max(len(df), 1) * 100
                     stats.append((f"Top {i+1}: {value}", f"{count} ({percentage:.2f}%)"))
             
             # Display results with formatting

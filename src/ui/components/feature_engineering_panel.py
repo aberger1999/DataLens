@@ -302,12 +302,15 @@ class FeatureEngineeringPanel(QWidget):
         """Apply the selected numeric operation to create a new feature."""
         if self.data_manager.data is None:
             return
-            
+
         df = self.data_manager.data.copy()
         col = self.numeric_col_combo.currentText()
         operation = self.numeric_op_combo.currentText()
         new_name = self.numeric_name_edit.text()
-        
+
+        if not col:
+            QMessageBox.warning(self, "Warning", "Please select a numeric column.")
+            return
         if not new_name:
             QMessageBox.warning(self, "Warning", "Please specify a name for the new feature.")
             return
@@ -362,6 +365,10 @@ class FeatureEngineeringPanel(QWidget):
         col = self.cat_col_combo.currentText()
         method = self.encoding_combo.currentText()
 
+        if not col:
+            QMessageBox.warning(self, "Warning", "Please select a categorical column.")
+            return
+
         try:
             if method == "Label Encoding":
                 if col not in self.label_encoders:
@@ -376,14 +383,15 @@ class FeatureEngineeringPanel(QWidget):
                 # Create binary encoding manually
                 unique_values = df[col].unique()
                 n_values = len(unique_values)
-                n_bits = int(np.ceil(np.log2(n_values)))
+                n_bits = int(np.ceil(np.log2(max(n_values, 2))))
 
                 value_to_binary = {val: format(i, f'0{n_bits}b')
                                  for i, val in enumerate(unique_values)}
 
                 for bit in range(n_bits):
+                    # Use default arg to capture current bit value (avoids closure bug)
                     df[f"{col}_bin_{bit}"] = df[col].map(
-                        lambda x: int(value_to_binary[x][bit]))
+                        lambda x, b=bit: int(value_to_binary[x][b]))
 
             elif method == "Frequency Encoding":
                 frequency = df[col].value_counts(normalize=True)
@@ -410,6 +418,10 @@ class FeatureEngineeringPanel(QWidget):
         df = self.data_manager.data.copy()
         col = self.dt_col_combo.currentText()
 
+        if not col:
+            QMessageBox.warning(self, "Warning", "Please select a datetime column.")
+            return
+
         try:
             if self.year_check.isChecked():
                 df[f"{col}_year"] = pd.to_datetime(df[col]).dt.year
@@ -426,7 +438,7 @@ class FeatureEngineeringPanel(QWidget):
             if self.quarter_check.isChecked():
                 df[f"{col}_quarter"] = pd.to_datetime(df[col]).dt.quarter
             if self.is_weekend_check.isChecked():
-                df[f"{col}_is_weekend"] = pd.to_datetime(df[col]).dt.dayofweek.isin([5, 6])
+                df[f"{col}_is_weekend"] = pd.to_datetime(df[col]).dt.dayofweek.isin([5, 6]).astype(int)
 
             self.data_manager._data = df
             self.data_manager.data_loaded.emit(df)

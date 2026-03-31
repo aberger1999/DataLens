@@ -1,6 +1,6 @@
 @echo off
 REM Build script for creating installer using PyInstaller + Inno Setup
-REM This is the RECOMMENDED approach for PyQt6 applications
+REM For PyQt5 Data Analysis Application
 
 echo ========================================
 echo Data Analysis Application Installer Builder
@@ -9,7 +9,7 @@ echo ========================================
 echo.
 
 REM Step 1: Build with PyInstaller
-echo [1/3] Building application with PyInstaller...
+echo [1/2] Building application with PyInstaller...
 pyinstaller data_analysis_app.spec --noconfirm
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: PyInstaller build failed!
@@ -18,18 +18,8 @@ if %ERRORLEVEL% NEQ 0 (
 echo Application built successfully!
 echo.
 
-REM Step 2: Fix Qt DLL paths (copy to root for proper loading)
-echo [2/3] Fixing Qt DLL paths...
-if exist "dist\data_analysis_app\_internal\Qt6*.dll" (
-    copy /Y "dist\data_analysis_app\_internal\Qt6*.dll" "dist\data_analysis_app\" >nul 2>&1
-    echo Qt DLLs copied successfully!
-) else (
-    echo WARNING: No Qt DLLs found to copy
-)
-echo.
-
-REM Step 3: Check if Inno Setup is installed
-echo [3/3] Creating installer with Inno Setup...
+REM Step 2: Check if Inno Setup is installed
+echo [2/2] Creating installer with Inno Setup...
 
 set INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
 if not exist "%INNO_PATH%" (
@@ -65,7 +55,7 @@ echo.
 echo ========================================
 echo BUILD COMPLETE!
 echo ========================================
-echo Installer location: installer\DataAnalysisApp-Setup-1.0.0.exe
+echo Installer location: installer_output\DataAnalysisApp-Setup-1.0.0.exe
 echo.
 echo You can now distribute this installer to users!
 echo.

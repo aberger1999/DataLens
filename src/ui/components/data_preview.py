@@ -5,9 +5,11 @@ Data preview panel for displaying and basic manipulation of loaded data.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QLabel, QHeaderView, QHBoxLayout, QPushButton, QSpinBox,
-    QComboBox, QLineEdit, QGroupBox, QGridLayout
+    QComboBox, QLineEdit, QGroupBox, QGridLayout, QApplication,
+    QShortcut
 )
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QKeySequence
 import pandas as pd
 
 class DataPreviewPanel(QWidget):
@@ -77,24 +79,43 @@ class DataPreviewPanel(QWidget):
         self.info_label = QLabel("No data loaded")
         top_layout.addWidget(self.info_label)
         
+        # Rows per page selector
+        rows_layout = QHBoxLayout()
+        rows_label = QLabel("Rows per page:")
+        self.rows_per_page_combo = QComboBox()
+        self.rows_per_page_combo.addItems(["100", "250", "500", "1000"])
+        self.rows_per_page_combo.setCurrentText("100")
+        self.rows_per_page_combo.setFixedWidth(80)
+        rows_layout.addWidget(rows_label)
+        rows_layout.addWidget(self.rows_per_page_combo)
+        top_layout.addLayout(rows_layout)
+
+        # Copy button
+        self.copy_btn = QPushButton("Copy Selection")
+        self.copy_btn.setToolTip("Copy selected cells to clipboard (Ctrl+C)")
+        self.copy_btn.clicked.connect(self.copy_selection_to_clipboard)
+        top_layout.addWidget(self.copy_btn)
+
+        top_layout.addStretch()
+
         # Navigation controls
         nav_layout = QHBoxLayout()
         self.prev_btn = QPushButton("Previous")
         self.prev_btn.setEnabled(False)
         self.next_btn = QPushButton("Next")
         self.next_btn.setEnabled(False)
-        
+
         self.page_spin = QSpinBox()
         self.page_spin.setMinimum(1)
         self.page_spin.setEnabled(False)
-        
+
         self.total_pages_label = QLabel("of 1")
-        
+
         nav_layout.addWidget(self.prev_btn)
         nav_layout.addWidget(self.page_spin)
         nav_layout.addWidget(self.total_pages_label)
         nav_layout.addWidget(self.next_btn)
-        
+
         top_layout.addLayout(nav_layout)
         layout.addLayout(top_layout)
         
@@ -104,6 +125,10 @@ class DataPreviewPanel(QWidget):
         # Make cells not editable
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
+
+        # Ctrl+C shortcut for copying
+        copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self.table)
+        copy_shortcut.activated.connect(self.copy_selection_to_clipboard)
         
     def setup_connections(self):
         """Setup signal connections."""
@@ -113,6 +138,7 @@ class DataPreviewPanel(QWidget):
         self.page_spin.valueChanged.connect(self.go_to_page)
         self.apply_filter_btn.clicked.connect(self.apply_filter)
         self.clear_filter_btn.clicked.connect(self.clear_filter)
+        self.rows_per_page_combo.currentTextChanged.connect(self.on_rows_per_page_changed)
         
     def on_data_loaded(self, df):
         """Handle when new data is loaded."""
@@ -133,12 +159,18 @@ class DataPreviewPanel(QWidget):
         # Reset to page 1
         self.current_page = 0
         
-        # Reset filtered data to the full dataset
-        self.filtered_data = df.copy()  # Make a copy to ensure we're working with the latest data
+        # Reference the full dataset (copy only made when filtering)
+        self.filtered_data = df
         
         # Update the table view with the latest data
         self.update_table_view()
         
+    def on_rows_per_page_changed(self, text):
+        """Handle rows per page selection change."""
+        self.MAX_ROWS_PER_PAGE = int(text)
+        self.current_page = 0
+        self.update_table_view()
+
     def apply_filter(self):
         """Apply the filter to the data."""
         if self.data_manager.data is None:
@@ -326,13 +358,49 @@ class DataPreviewPanel(QWidget):
                     item = QTableWidgetItem(value)
                     self.table.setItem(row_idx, col_idx, item)
                     
-            # Adjust column widths if this is the first page
+            # Set sensible default column widths (avoids expensive ResizeToContents)
             if self.current_page == 0:
                 header = self.table.horizontalHeader()
-                for i in range(self.filtered_data.shape[1]):
-                    header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+                header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+                header.setDefaultSectionSize(120)
         finally:
             # Re-enable table updates
             self.table.setUpdatesEnabled(True)
             
-        self.update_navigation_buttons() 
+        self.update_navigation_buttons()
+
+    def copy_selection_to_clipboard(self):
+        """Copy selected cells from the table to the clipboard as tab-separated text."""
+        selection = self.table.selectedRanges()
+        if not selection:
+            return
+
+        # Collect all selected ranges into a unified grid
+        rows = set()
+        cols = set()
+        for sel_range in selection:
+            for r in range(sel_range.topRow(), sel_range.bottomRow() + 1):
+                rows.add(r)
+            for c in range(sel_range.leftColumn(), sel_range.rightColumn() + 1):
+                cols.add(c)
+
+        rows = sorted(rows)
+        cols = sorted(cols)
+
+        lines = []
+        # Include column headers
+        header_parts = []
+        for c in cols:
+            header = self.table.horizontalHeaderItem(c)
+            header_parts.append(header.text() if header else "")
+        lines.append("\t".join(header_parts))
+
+        for r in rows:
+            parts = []
+            for c in cols:
+                item = self.table.item(r, c)
+                parts.append(item.text() if item else "")
+            lines.append("\t".join(parts))
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText("\n".join(lines))

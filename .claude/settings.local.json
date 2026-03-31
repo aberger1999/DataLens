@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(./venv/Scripts/pyinstaller.exe:*)",
+      "Bash(./venv/Scripts/python.exe -m PyInstaller:*)",
+      "Bash(test:*)",
+      "Bash(\"/c/Program Files \\(x86\\)/Inno Setup 6/ISCC.exe\" \"installer/inno_setup.iss\")"
+    ]
+  }
+}

@@ -241,7 +241,8 @@ class MachineLearningPanel(QWidget):
             checkbox.setChecked(True)  # Default to selected
             self.features_table.setCellWidget(i, 1, checkbox)
         
-        self.features_table.resizeColumnsToContents()
+        header = self.features_table.horizontalHeader()
+        header.setStretchLastSection(True)
         
     def update_model_list(self):
         """Update the model list based on problem type."""
@@ -290,9 +291,20 @@ class MachineLearningPanel(QWidget):
             QMessageBox.warning(self, "Warning", "Please select at least one feature.")
             return False
             
-        X = df[self.feature_columns]
-        y = df[target_col]
-        
+        # Validate that feature columns are numeric
+        non_numeric = [c for c in self.feature_columns
+                       if not pd.api.types.is_numeric_dtype(df[c])]
+        if non_numeric:
+            QMessageBox.warning(
+                self, "Warning",
+                f"Non-numeric feature columns detected: {', '.join(non_numeric)}.\n"
+                "Please encode categorical features first (Feature Engineering tab)."
+            )
+            return False
+
+        X = df[self.feature_columns].copy()
+        y = df[target_col].copy()
+
         # Apply scaling if selected
         scaling_method = self.scaling_combo.currentText()
         if scaling_method != "None":
@@ -373,29 +385,30 @@ class MachineLearningPanel(QWidget):
             # Calculate metrics based on problem type
             if self.problem_combo.currentText() == "Classification":
                 metrics = {
-                    "Accuracy/R²": accuracy_score(self.y_test, y_pred),
-                    "Precision/MAE": precision_score(self.y_test, y_pred, average='weighted'),
-                    "Recall/MSE": recall_score(self.y_test, y_pred, average='weighted'),
-                    "F1/RMSE": f1_score(self.y_test, y_pred, average='weighted')
+                    "Accuracy/R²": ("Accuracy", accuracy_score(self.y_test, y_pred)),
+                    "Precision/MAE": ("Precision", precision_score(self.y_test, y_pred, average='weighted')),
+                    "Recall/MSE": ("Recall", recall_score(self.y_test, y_pred, average='weighted')),
+                    "F1/RMSE": ("F1 Score", f1_score(self.y_test, y_pred, average='weighted'))
                 }
             else:  # Regression
                 metrics = {
-                    "Accuracy/R²": r2_score(self.y_test, y_pred),
-                    "Precision/MAE": mean_absolute_error(self.y_test, y_pred),
-                    "Recall/MSE": mean_squared_error(self.y_test, y_pred),
-                    "F1/RMSE": np.sqrt(mean_squared_error(self.y_test, y_pred))
+                    "Accuracy/R²": ("R²", r2_score(self.y_test, y_pred)),
+                    "Precision/MAE": ("MAE", mean_absolute_error(self.y_test, y_pred)),
+                    "Recall/MSE": ("MSE", mean_squared_error(self.y_test, y_pred)),
+                    "F1/RMSE": ("RMSE", np.sqrt(mean_squared_error(self.y_test, y_pred)))
                 }
                 
-            # Update metrics labels
-            for metric, value in metrics.items():
-                self.metrics_labels[metric].setText(f"{value:.4f}")
+            # Update metrics labels with descriptive names
+            for key, (label_text, value) in metrics.items():
+                self.metrics_labels[key].setText(f"{label_text}: {value:.4f}")
                 
-            # Perform cross-validation
+            # Perform cross-validation on training data only (avoid data leakage)
+            cv_model = self.get_model_instance()
             cv_scores = cross_val_score(
-                self.model, 
-                pd.concat([self.X_train, self.X_test]),
-                pd.concat([self.y_train, self.y_test]),
-                cv=self.cv_spin.value()
+                cv_model,
+                self.X_train,
+                self.y_train,
+                cv=min(self.cv_spin.value(), len(self.X_train))
             )
             
             # Update CV table
@@ -512,14 +525,22 @@ class MachineLearningPanel(QWidget):
                     'Predicted': self.results_table.item(i, 2).text()
                 })
                 
-            # Create DataFrame and export
+            # Create DataFrame and export via file dialog
+            from PyQt5.QtWidgets import QFileDialog
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Export Predictions", "predictions.csv",
+                "CSV Files (*.csv);;All Files (*)"
+            )
+            if not file_path:
+                return
+
             pred_df = pd.DataFrame(predictions)
-            pred_df.to_csv('predictions.csv', index=False)
-            
+            pred_df.to_csv(file_path, index=False)
+
             QMessageBox.information(
                 self,
                 "Success",
-                "Predictions exported to 'predictions.csv'"
+                f"Predictions exported to '{file_path}'"
             )
             
         except Exception as e:

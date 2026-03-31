@@ -32,6 +32,11 @@ ENV/
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+install_log.txt
+inno_build.log
+
+# Redistributables
+vc_redist*.exe
 
 # Unit test / coverage reports
 htmlcov/
@@ -62,6 +67,7 @@ cover/
 
 # Distribution / Installers
 release/
+installer_output/
 *.zip
 *.exe
 *.dmg

@@ -45,7 +45,7 @@ class DataManager(QObject):
     def load_csv(self, file_path):
         """
         Load data from a CSV file.
-        
+
         Args:
             file_path (str): Path to the CSV file
 
@@ -56,7 +56,10 @@ class DataManager(QObject):
         try:
             self._data = pd.read_csv(file_path, low_memory=False)
             self.data_loaded.emit(self._data)
-            self.save_workspace_data()  # Autosave imported data
+
+            # Defer disk I/O so the UI updates first
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, self.save_workspace_data)
 
             if self.workspace_path:
                 import shutil
@@ -65,7 +68,7 @@ class DataManager(QObject):
                 filename = os.path.basename(file_path)
                 dest_path = os.path.join(data_folder, filename)
                 if file_path != dest_path:
-                    shutil.copy2(file_path, dest_path)
+                    QTimer.singleShot(0, lambda: shutil.copy2(file_path, dest_path))
         except Exception as e:
             self.data_error.emit(f"Error loading CSV file: {str(e)}")
 

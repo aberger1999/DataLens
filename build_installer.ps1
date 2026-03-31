@@ -1,5 +1,5 @@
 # PowerShell script to build installer using PyInstaller + Inno Setup
-# This is the RECOMMENDED approach for PyQt6 applications
+# For PyQt5 Data Analysis Application
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Data Analysis Application Installer Builder" -ForegroundColor Cyan
@@ -8,7 +8,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Step 1: Build with PyInstaller
-Write-Host "[1/3] Building application with PyInstaller..." -ForegroundColor Yellow
+Write-Host "[1/2] Building application with PyInstaller..." -ForegroundColor Yellow
 pyinstaller data_analysis_app.spec --noconfirm
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: PyInstaller build failed!" -ForegroundColor Red
@@ -17,19 +17,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Application built successfully!" -ForegroundColor Green
 Write-Host ""
 
-# Step 2: Fix Qt DLL paths (copy to root for proper loading)
-Write-Host "[2/3] Fixing Qt DLL paths..." -ForegroundColor Yellow
-$qtDlls = Get-ChildItem "dist\data_analysis_app\_internal\Qt6*.dll" -ErrorAction SilentlyContinue
-if ($qtDlls) {
-    Copy-Item "dist\data_analysis_app\_internal\Qt6*.dll" "dist\data_analysis_app\" -Force
-    Write-Host "Qt DLLs copied successfully!" -ForegroundColor Green
-} else {
-    Write-Host "WARNING: No Qt DLLs found to copy" -ForegroundColor Yellow
-}
-Write-Host ""
-
-# Step 3: Check if Inno Setup is installed
-Write-Host "[3/3] Creating installer with Inno Setup..." -ForegroundColor Yellow
+# Step 2: Check if Inno Setup is installed
+Write-Host "[2/2] Creating installer with Inno Setup..." -ForegroundColor Yellow
 
 $innoSetupPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $innoSetupPath)) {
@@ -64,11 +53,11 @@ if (-not (Test-Path $innoSetupPath)) {
     Write-Host "BUILD COMPLETE!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     
-    $installerFile = Get-ChildItem -Path "installer" -Filter "DataAnalysisApp-Setup-*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $installerFile = Get-ChildItem -Path "installer_output" -Filter "DataAnalysisApp-Setup-*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($installerFile) {
         Write-Host "Installer location: $($installerFile.FullName)" -ForegroundColor Cyan
     } else {
-        Write-Host "Installer location: installer\DataAnalysisApp-Setup-1.0.0.exe" -ForegroundColor Cyan
+        Write-Host "Installer location: installer_output\DataAnalysisApp-Setup-1.0.0.exe" -ForegroundColor Cyan
     }
     Write-Host ""
     Write-Host "You can now distribute this installer to users!" -ForegroundColor White

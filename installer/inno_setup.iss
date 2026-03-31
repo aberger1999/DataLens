@@ -3,7 +3,7 @@
 
 #define MyAppName "Data Analysis Application"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Your Company Name"
+#define MyAppPublisher "Alex Berger"
 #define MyAppExeName "data_analysis_app.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".daa"
@@ -18,9 +18,9 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\installer\license.txt
-OutputDir=.
+OutputDir=..\installer_output
 OutputBaseFilename=DataAnalysisApp-Setup-{#MyAppVersion}
-SetupIconFile=..\icon.png
+SetupIconFile=..\assets\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
