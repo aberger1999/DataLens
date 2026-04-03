@@ -248,7 +248,7 @@ Data-Analysis-Application/
 
 ## License
 
-[Add your license here]
+Licensed under the Open Software License version 3.0
 
 ## Contributing
 
