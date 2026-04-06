@@ -1,100 +1,219 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>{{ title }}</title>
     <style>
+        /* ── Reset ─────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 40px;
-            color: #333;
+            font-family: {{ font_family }};
+            font-size: {{ font_size }};
+            line-height: 1.65;
+            color: {{ text_color }};
+            background-color: {{ page_bg }};
+            padding: 32px 40px;
+            -webkit-font-smoothing: antialiased;
         }
-        h1, h2, h3 {
-            color: #2c3e50;
+
+        /* ── Editable hover indicator ──────────────────────────── */
+        [contenteditable="true"] {
+            outline: none;
+            border-radius: 3px;
+            transition: box-shadow 0.15s ease;
         }
-        .header {
-            border-bottom: 2px solid #3498db;
-            margin-bottom: 30px;
-            padding-bottom: 10px;
+        [contenteditable="true"]:hover {
+            box-shadow: inset 0 0 0 1.5px {{ accent_color }}44;
         }
+        [contenteditable="true"]:focus {
+            box-shadow: inset 0 0 0 1.5px {{ accent_color }};
+        }
+
+        /* ── Header ────────────────────────────────────────────── */
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid {{ accent_color }};
+            padding-bottom: 14px;
+            margin-bottom: 36px;
+        }
+        .report-header h1 {
+            font-size: 1.85em;
+            font-weight: 700;
+            color: {{ heading_color }};
+            line-height: 1.2;
+        }
+        .report-header .timestamp {
+            font-size: 0.78em;
+            color: {{ muted_color }};
+            font-style: italic;
+            white-space: nowrap;
+            padding-top: 6px;
+        }
+
+        /* ── Sections ──────────────────────────────────────────── */
         .section {
-            margin-bottom: 40px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 36px;
         }
+        .section h2 {
+            font-size: 1.35em;
+            font-weight: 600;
+            color: {{ accent_color }};
+            border-bottom: 2px solid {{ accent_color }};
+            padding-bottom: 6px;
+            margin-bottom: 18px;
+        }
+        .section h3 {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: {{ heading_color }};
+            margin: 20px 0 10px 0;
+        }
+        .section p {
+            margin: 8px 0;
+        }
+
+        /* ── Metric cards ──────────────────────────────────────── */
+        .metrics-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .metric {
+            flex: 1 1 140px;
+            padding: 16px 18px;
+            background-color: {{ metric_bg }};
+            border-radius: 8px;
+            border: 1px solid {{ border_color }};
+        }
+        .metric-label {
+            font-size: 0.72em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: {{ sublabel_color }};
+            margin-bottom: 4px;
+        }
+        .metric-value {
+            font-size: 1.45em;
+            font-weight: 700;
+            color: {{ value_color }};
+        }
+
+        /* ── Table wrapper (horizontal scroll for wide tables) ── */
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            margin: 14px 0;
+        }
+
+        /* ── Tables ────────────────────────────────────────────── */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
+            font-size: 0.92em;
         }
         th {
-            background-color: #3498db;
-            color: white;
+            background-color: {{ accent_color }};
+            color: #ffffff;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        td {
+            padding: 9px 12px;
+            border-bottom: 1px solid {{ table_border }};
         }
         tr:nth-child(even) {
-            background-color: #f2f2f2;
+            background-color: {{ table_alt }};
         }
-        .timestamp {
-            color: #7f8c8d;
-            font-style: italic;
+        tr:nth-child(odd) {
+            background-color: {{ table_row }};
         }
+
+        /* ── Lists ─────────────────────────────────────────────── */
+        ul {
+            padding-left: 22px;
+            margin: 10px 0;
+        }
+        li {
+            margin: 3px 0;
+        }
+
+        /* ── Images (charts) ───────────────────────────────────── */
         img {
             max-width: 100%;
             height: auto;
-            margin: 20px 0;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            margin: 18px 0;
+            border-radius: 6px;
+            border: 1px solid {{ border_color }};
         }
-        .metric {
-            display: inline-block;
-            margin: 10px;
-            padding: 15px;
-            background-color: #fff;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .metric-value {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #2980b9;
-        }
+
+        /* ── Notes ─────────────────────────────────────────────── */
         .notes {
-            background-color: #fff;
-            padding: 20px;
-            border-left: 4px solid #3498db;
-            margin: 20px 0;
+            padding: 18px 22px;
+            border-left: 4px solid {{ accent_color }};
+            background-color: {{ metric_bg }};
+            border-radius: 0 6px 6px 0;
+            margin: 14px 0;
+        }
+
+        /* ── Watermark footer ─────────────────────────────────── */
+        .report-watermark {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 40px;
+            padding-top: 8px;
+            border-top: 1px solid {{ watermark_border }};
+            font-size: 10px;
+            color: #94a3b8;
+            letter-spacing: 0.03em;
+        }
+        .report-watermark .wm-logo {
+            display: inline-block;
+            background-color: {{ accent_color }};
+            color: #ffffff;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 3px;
+            padding: 1px 4px;
+            margin-right: 2px;
+            line-height: 1.3;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>{{ title }}</h1>
-        <p class="timestamp">Generated on: {{ timestamp }}</p>
+    <div class="report-header">
+        <h1 contenteditable="true">{{ title }}</h1>
+        <span class="timestamp">Generated on: {{ timestamp }}</span>
     </div>
 
     {% if overview %}
     <div class="section">
-        <h2>Data Overview</h2>
-        <div class="metric">
-            <div>Number of Rows</div>
-            <div class="metric-value">{{ overview.num_rows }}</div>
+        <h2 contenteditable="true">Data Overview</h2>
+        <div class="metrics-row">
+            <div class="metric">
+                <div class="metric-label">Number of Rows</div>
+                <div class="metric-value">{{ overview.num_rows }}</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Number of Columns</div>
+                <div class="metric-value">{{ overview.num_cols }}</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Memory Usage</div>
+                <div class="metric-value">{{ "%.2f"|format(overview.memory_usage) }} MB</div>
+            </div>
         </div>
-        <div class="metric">
-            <div>Number of Columns</div>
-            <div class="metric-value">{{ overview.num_cols }}</div>
-        </div>
-        <div class="metric">
-            <div>Memory Usage</div>
-            <div class="metric-value">{{ "%.2f"|format(overview.memory_usage) }} MB</div>
-        </div>
-        
+
         <h3>Column Types</h3>
         <table>
             <tr>
@@ -108,7 +227,7 @@
             </tr>
             {% endfor %}
         </table>
-        
+
         <h3>Columns</h3>
         <ul>
             {% for column in overview.columns %}
@@ -120,26 +239,26 @@
 
     {% if stats %}
     <div class="section">
-        <h2>Descriptive Statistics</h2>
-        
+        <h2 contenteditable="true">Descriptive Statistics</h2>
+
         <h3>Numeric Variables</h3>
-        {{ stats.numeric_stats|safe }}
-        
+        <div class="table-wrap">{{ stats.numeric_stats|safe }}</div>
+
         <h3>Categorical Variables</h3>
-        {{ stats.categorical_stats|safe }}
+        <div class="table-wrap">{{ stats.categorical_stats|safe }}</div>
     </div>
     {% endif %}
 
     {% if quality %}
     <div class="section">
-        <h2>Data Quality Analysis</h2>
-        
+        <h2 contenteditable="true">Data Quality Analysis</h2>
+
         <h3>Missing Values</h3>
         <table>
             <tr>
                 <th>Column</th>
                 <th>Missing Count</th>
-                <th>Missing Percentage</th>
+                <th>Missing %</th>
             </tr>
             {% for column in quality.missing_values.keys() %}
             <tr>
@@ -149,10 +268,10 @@
             </tr>
             {% endfor %}
         </table>
-        
+
         <h3>Duplicate Rows</h3>
-        <p>Number of duplicate rows: {{ quality.duplicates }}</p>
-        
+        <p contenteditable="true">Number of duplicate rows: {{ quality.duplicates }}</p>
+
         <h3>Unique Values</h3>
         <table>
             <tr>
@@ -171,11 +290,11 @@
 
     {% if correlation %}
     <div class="section">
-        <h2>Correlation Analysis</h2>
-        
+        <h2 contenteditable="true">Correlation Analysis</h2>
+
         <h3>Correlation Matrix</h3>
-        {{ correlation.correlation_matrix|safe }}
-        
+        <div class="table-wrap">{{ correlation.correlation_matrix|safe }}</div>
+
         <h3>Correlation Heatmap</h3>
         <img src="{{ correlation.heatmap_path }}" alt="Correlation Heatmap">
     </div>
@@ -183,7 +302,7 @@
 
     {% if distributions %}
     <div class="section">
-        <h2>Distribution Analysis</h2>
+        <h2 contenteditable="true">Distribution Analysis</h2>
         {% for column, plot_path in distributions.items() %}
         <h3>Distribution of {{ column }}</h3>
         <img src="{{ plot_path }}" alt="Distribution of {{ column }}">
@@ -193,7 +312,7 @@
 
     {% if timeseries %}
     <div class="section">
-        <h2>Time Series Analysis</h2>
+        <h2 contenteditable="true">Time Series Analysis</h2>
         {% for column, plot_path in timeseries.items() %}
         <h3>{{ column }} over Time</h3>
         <img src="{{ plot_path }}" alt="Time series of {{ column }}">
@@ -203,18 +322,25 @@
 
     {% if ml_results %}
     <div class="section">
-        <h2>Machine Learning Results</h2>
-        <!-- ML results will be added when connected to ML panel -->
+        <h2 contenteditable="true">Machine Learning Results</h2>
+        <p contenteditable="true">Model results will appear here when connected to the ML panel.</p>
     </div>
     {% endif %}
 
     {% if custom_notes %}
     <div class="section">
-        <h2>Custom Notes</h2>
-        <div class="notes">
+        <h2 contenteditable="true">Custom Notes</h2>
+        <div class="notes" contenteditable="true">
             {{ custom_notes|replace('\n', '<br>')|safe }}
         </div>
     </div>
     {% endif %}
+
+    <div class="report-watermark">
+        <span class="wm-logo">DL</span>
+        DataLens
+        <span>&middot;</span>
+        &copy; 2026 DataLens. All Rights Reserved.
+    </div>
 </body>
-</html> 
+</html>
