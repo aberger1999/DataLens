@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import os
+from ..theme import apply_dark_theme
 
 
 class _StyledSplitterHandle(QWidget):
@@ -1409,6 +1410,9 @@ class VisualizationPanel(QWidget):
                 if len(handles) > 0:
                     ax.legend(loc='best', fontsize=max(6, font_size - 1))
 
+            # Apply dark theme to all chart elements
+            apply_dark_theme(self.figure, ax)
+
             # Adjust layout to prevent label cutoff
             self.figure.tight_layout()
 
@@ -1419,6 +1423,7 @@ class VisualizationPanel(QWidget):
             ax.text(0.5, 0.5, f"Error: {str(e)}",
                    ha='center', va='center', color='red',
                    transform=ax.transAxes)
+            apply_dark_theme(self.figure, ax)
 
         # Redraw the canvas
         self.canvas.draw()

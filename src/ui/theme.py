@@ -729,3 +729,52 @@ def apply_theme(theme: str = "dark"):
 def get_colors(theme: str = "dark") -> dict:
     """Get the color dictionary for the given theme."""
     return PALETTES.get(theme, DARK)
+
+
+def apply_dark_theme(fig, ax):
+    """Apply dark theme styling to a matplotlib figure and axes.
+
+    Call this after plotting data and before canvas.draw() so that all
+    text, spines, and backgrounds match the app's dark palette.
+    """
+    c = DARK
+
+    # Figure & axes background
+    fig.patch.set_facecolor(c["bg_secondary"])      # #1a1f2e
+    ax.set_facecolor(c["bg_input"])                  # #1e2433
+
+    # Tick marks
+    ax.tick_params(colors='#cbd5e1')
+
+    # Axis labels
+    ax.xaxis.label.set_color('#cbd5e1')
+    ax.yaxis.label.set_color('#cbd5e1')
+
+    # Title
+    ax.title.set_color('#f1f5f9')
+
+    # Spines
+    ax.spines['bottom'].set_color((1.0, 1.0, 1.0, 0.15))
+    ax.spines['left'].set_color((1.0, 1.0, 1.0, 0.15))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    # Tick label colors
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_color('#cbd5e1')
+
+    # Legend
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.get_frame().set_facecolor(c["bg_input"])
+        for text in legend.get_texts():
+            text.set_color('#cbd5e1')
+        legend.get_frame().set_edgecolor((1.0, 1.0, 1.0, 0.15))
+
+    # Colorbar (if any)
+    for cb_ax in fig.get_axes():
+        if cb_ax is not ax:
+            cb_ax.tick_params(colors='#cbd5e1')
+            cb_ax.yaxis.label.set_color('#cbd5e1')
+            for label in cb_ax.get_yticklabels():
+                label.set_color('#cbd5e1')

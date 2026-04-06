@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import seaborn as sns
 import jinja2
+from ..theme import apply_dark_theme
 import os
 import tempfile
 
@@ -203,15 +204,17 @@ class ReportGeneratorPanel(QWidget):
             corr_matrix = numeric_df.corr().round(2)
             
             # Create correlation heatmap
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0)
-            plt.title('Correlation Heatmap')
-            
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, ax=ax)
+            ax.set_title('Correlation Heatmap')
+            apply_dark_theme(fig, ax)
+            fig.tight_layout()
+
             # Save plot to temporary file
             tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             tmp.close()
-            plt.savefig(tmp.name)
-            plt.close()
+            fig.savefig(tmp.name, facecolor=fig.get_facecolor())
+            plt.close(fig)
             self._temp_files.append(tmp.name)
 
             return {
@@ -230,13 +233,15 @@ class ReportGeneratorPanel(QWidget):
         distributions = {}
         
         for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
-            plt.figure(figsize=(10, 6))
-            sns.histplot(data=df, x=col, kde=True)
-            plt.title(f'Distribution of {col}')
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.histplot(data=df, x=col, kde=True, ax=ax)
+            ax.set_title(f'Distribution of {col}')
+            apply_dark_theme(fig, ax)
+            fig.tight_layout()
             tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             tmp.close()
-            plt.savefig(tmp.name)
-            plt.close()
+            fig.savefig(tmp.name, facecolor=fig.get_facecolor())
+            plt.close(fig)
             self._temp_files.append(tmp.name)
             distributions[col] = tmp.name
             
@@ -256,14 +261,16 @@ class ReportGeneratorPanel(QWidget):
             
             for dt_col in datetime_cols[:1]:  # Use first datetime column
                 for num_col in numeric_cols:
-                    plt.figure(figsize=(12, 6))
-                    plt.plot(df[dt_col], df[num_col])
-                    plt.title(f'{num_col} over Time')
-                    plt.xticks(rotation=45)
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    ax.plot(df[dt_col], df[num_col])
+                    ax.set_title(f'{num_col} over Time')
+                    ax.tick_params(axis='x', rotation=45)
+                    apply_dark_theme(fig, ax)
+                    fig.tight_layout()
                     tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
                     tmp.close()
-                    plt.savefig(tmp.name)
-                    plt.close()
+                    fig.savefig(tmp.name, facecolor=fig.get_facecolor())
+                    plt.close(fig)
                     self._temp_files.append(tmp.name)
                     time_series_plots[num_col] = tmp.name
                     

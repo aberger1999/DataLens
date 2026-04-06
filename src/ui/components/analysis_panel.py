@@ -19,6 +19,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import seaborn as sns
 import matplotlib.pyplot as plt
+from ..theme import apply_dark_theme
 
 class AnalysisPanel(QWidget):
     """Panel for data analysis operations."""
@@ -182,6 +183,7 @@ class AnalysisPanel(QWidget):
         sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax, fmt=".2f")
         ax.set_title("Correlation Matrix")
 
+        apply_dark_theme(self.corr_figure, ax)
         self.corr_canvas.draw()
 
     def on_data_loaded(self, df):
@@ -262,6 +264,7 @@ class AnalysisPanel(QWidget):
                     ax.set_title(f"Pie Chart of {column}")
 
             # Adjust layout and draw
+            apply_dark_theme(self.figure, ax)
             self.figure.tight_layout()
             self.canvas.draw()
         except Exception as e:
@@ -271,15 +274,14 @@ class AnalysisPanel(QWidget):
         """Update the panel theme — mostly handled by global stylesheet now."""
         from ..theme import get_colors
         c = get_colors(theme_name)
-        bg_color = c['bg_primary']
 
         if hasattr(self, 'figure'):
-            self.figure.patch.set_facecolor(bg_color)
+            self.figure.patch.set_facecolor(c['bg_secondary'])
             if hasattr(self, 'canvas'):
                 self.canvas.draw()
 
         if hasattr(self, 'corr_figure'):
-            self.corr_figure.patch.set_facecolor(bg_color)
+            self.corr_figure.patch.set_facecolor(c['bg_secondary'])
             if hasattr(self, 'corr_canvas'):
                 self.corr_canvas.draw()
 

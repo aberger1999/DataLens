@@ -32,7 +32,7 @@ from sklearn.svm import SVC, SVR
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from ui.theme import get_colors
+from ui.theme import get_colors, apply_dark_theme
 from ui.components import modal
 
 
@@ -95,7 +95,8 @@ def _chip_style(selected=False):
                 border-radius: 14px;
                 padding: 4px 14px;
                 font-size: 12px;
-                min-height: 0px;
+                min-height: 28px;
+                max-height: 28px;
             }}
             QPushButton:hover {{
                 background-color: {c['accent_hover']};
@@ -110,7 +111,8 @@ def _chip_style(selected=False):
                 border-radius: 14px;
                 padding: 4px 14px;
                 font-size: 12px;
-                min-height: 0px;
+                min-height: 28px;
+                max-height: 28px;
             }}
             QPushButton:hover {{
                 background-color: {c['bg_hover']};
@@ -131,7 +133,8 @@ def _card_style(selected=False):
                 border-radius: 8px;
                 padding: 8px 4px;
                 font-size: 12px;
-                min-height: 0px;
+                min-height: 64px;
+                max-height: 64px;
                 text-align: center;
             }}
         """
@@ -144,7 +147,8 @@ def _card_style(selected=False):
                 border-radius: 8px;
                 padding: 8px 4px;
                 font-size: 12px;
-                min-height: 0px;
+                min-height: 64px;
+                max-height: 64px;
                 text-align: center;
             }}
             QPushButton:hover {{
@@ -305,8 +309,7 @@ class CardSelector(QWidget):
         btn.setCursor(QCursor(Qt.PointingHandCursor))
         btn.setStyleSheet(_card_style(False) + "QPushButton { text-align: center; }")
         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        if subtitle:
-            btn.setMinimumHeight(48)
+        btn.setFixedHeight(64)
         btn.clicked.connect(lambda: self._on_clicked(key))
         idx = len(self._cards)
         row, col = divmod(idx, self._columns)
@@ -1198,23 +1201,15 @@ class MachineLearningPanel(QWidget):
             sorted_importances = importances[indices]
 
             ax = self.importance_figure.add_subplot(111)
-            ax.set_facecolor('#0f1117')
-            self.importance_figure.set_facecolor('#0f1117')
 
             y_pos = np.arange(len(sorted_features))
             ax.barh(y_pos, sorted_importances, color=c['accent'], height=0.6)
             ax.set_yticks(y_pos)
-            ax.set_yticklabels(sorted_features, fontsize=9, color=c['text_secondary'])
-            ax.set_xlabel('Importance', fontsize=10, color=c['text_secondary'])
-            ax.set_title('Feature Importance', fontsize=12, color=c['text_primary'],
-                         fontweight='bold')
+            ax.set_yticklabels(sorted_features, fontsize=9)
+            ax.set_xlabel('Importance', fontsize=10)
+            ax.set_title('Feature Importance', fontsize=12, fontweight='bold')
 
-            ax.tick_params(axis='x', colors=c['text_secondary'], labelsize=9)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_color(c['border'])
-            ax.spines['left'].set_color(c['border'])
-
+            apply_dark_theme(self.importance_figure, ax)
             self.importance_figure.tight_layout()
             self.importance_canvas.draw()
 

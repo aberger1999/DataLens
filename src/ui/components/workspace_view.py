@@ -97,6 +97,14 @@ class WorkspaceView(QWidget):
         self.load_btn.clicked.connect(self.load_data)
         header_layout.addWidget(self.load_btn)
 
+        # Discard Changes button (left of Save)
+        self.discard_btn = QPushButton("Discard Changes")
+        self.discard_btn.setEnabled(False)
+        self.discard_btn.setCursor(Qt.CursorShape.ForbiddenCursor)
+        self.discard_btn.clicked.connect(self.discard_changes)
+        header_layout.addWidget(self.discard_btn)
+        self._apply_discard_btn_style()
+
         self.save_btn = QPushButton("Save Workspace")
         self.save_btn.setProperty("cssClass", "primary")
         self.save_btn.setEnabled(False)
@@ -296,11 +304,47 @@ class WorkspaceView(QWidget):
         self.has_unsaved_changes = True
         self.update_save_button()
 
+    def _apply_discard_btn_style(self):
+        """Apply the correct style to the discard button based on state."""
+        if self.discard_btn.isEnabled():
+            self.discard_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.discard_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #e2e4ed;
+                    border: 1px solid rgba(255,255,255,0.25);
+                    padding: 7px 16px;
+                    border-radius: 6px;
+                    min-height: 20px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255,255,255,0.06);
+                }
+            """)
+        else:
+            self.discard_btn.setCursor(Qt.CursorShape.ForbiddenCursor)
+            self.discard_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #6b7280;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    padding: 7px 16px;
+                    border-radius: 6px;
+                    min-height: 20px;
+                    font-weight: 500;
+                }
+            """)
+
     def update_save_button(self):
-        """Update the save button state."""
+        """Update the save button and discard button state."""
         has_data = self.data_manager.data is not None
         self.save_btn.setEnabled(has_data)
         self.export_btn.setEnabled(has_data)
+
+        # Update discard button
+        self.discard_btn.setEnabled(self.has_unsaved_changes and has_data)
+        self._apply_discard_btn_style()
 
         if self.has_unsaved_changes and has_data:
             self.save_btn.setText("Save Workspace *")
@@ -339,6 +383,23 @@ class WorkspaceView(QWidget):
                 "Error",
                 f"Error saving workspace: {str(e)}"
             )
+
+    def discard_changes(self):
+        """Discard all unsaved changes by reloading from last saved state."""
+        if not self.has_unsaved_changes:
+            return
+
+        result = modal.show_discard_confirm(
+            self,
+            "Discard Changes",
+            "Are you sure you want to discard all unsaved changes? This cannot be undone."
+        )
+
+        if result:
+            # Reload from last saved workspace data
+            self.data_manager.load_workspace_data()
+            self.has_unsaved_changes = False
+            self.update_save_button()
 
     def on_back_clicked(self):
         """Handle back button click with unsaved changes check."""

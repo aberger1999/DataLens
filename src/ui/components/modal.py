@@ -223,6 +223,132 @@ def show_question(parent, title, message):
     return dlg.exec() == QDialog.Accepted
 
 
+def show_discard_confirm(parent, title, message):
+    """
+    Show a Discard/Cancel confirmation modal.
+    Returns True if user clicked Discard, False if Cancel.
+    Discard button has a warm/red tint; Cancel is accent filled.
+    """
+    c = _colors()
+
+    dialog = QDialog(parent, Qt.FramelessWindowHint)
+    dialog.setModal(True)
+    dialog.setAttribute(Qt.WA_TranslucentBackground)
+
+    overlay = QWidget(dialog)
+    overlay.setStyleSheet("background: rgba(0, 0, 0, 0.6);")
+
+    box = QWidget(overlay)
+    box.setStyleSheet(f"""
+        QWidget {{
+            background-color: #1e2433;
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 10px;
+            border-left: 3px solid {c['danger']};
+        }}
+    """)
+
+    box_layout = QVBoxLayout(box)
+    box_layout.setContentsMargins(24, 24, 24, 24)
+    box_layout.setSpacing(12)
+
+    title_label = QLabel(title)
+    title_label.setStyleSheet(f"""
+        QLabel {{
+            color: {c['text_primary']};
+            font-size: 15px;
+            font-weight: 700;
+            background: transparent;
+            border: none;
+        }}
+    """)
+    box_layout.addWidget(title_label)
+
+    body_label = QLabel(message)
+    body_label.setWordWrap(True)
+    body_label.setStyleSheet(f"""
+        QLabel {{
+            color: #9ca3af;
+            font-size: 13px;
+            background: transparent;
+            border: none;
+            padding-right: 8px;
+        }}
+    """)
+    box_layout.addWidget(body_label)
+
+    btn_layout = QHBoxLayout()
+    btn_layout.setSpacing(8)
+    btn_layout.addStretch()
+
+    # Discard button (outlined, warm/red tint)
+    discard_btn = QPushButton("Discard")
+    discard_btn.setCursor(QCursor(Qt.PointingHandCursor))
+    discard_btn.setMinimumWidth(80)
+    discard_btn.setStyleSheet(f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {c['danger']};
+            border: 1px solid {c['danger']};
+            border-radius: 6px;
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            min-height: 0px;
+        }}
+        QPushButton:hover {{
+            background-color: rgba(239,68,68,0.15);
+        }}
+    """)
+    discard_btn.clicked.connect(dialog.accept)
+    btn_layout.addWidget(discard_btn)
+
+    # Cancel button (accent filled)
+    cancel_btn = QPushButton("Cancel")
+    cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
+    cancel_btn.setMinimumWidth(80)
+    cancel_btn.setStyleSheet(f"""
+        QPushButton {{
+            background-color: {c['accent']};
+            color: {c['text_inverse']};
+            border: none;
+            border-radius: 6px;
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            min-height: 0px;
+        }}
+        QPushButton:hover {{
+            background-color: {c['accent_hover']};
+        }}
+    """)
+    cancel_btn.clicked.connect(dialog.reject)
+    btn_layout.addWidget(cancel_btn)
+
+    box_layout.addLayout(btn_layout)
+
+    def _resize():
+        dialog.resize(parent.size() if parent else dialog.size())
+        overlay.setGeometry(0, 0, dialog.width(), dialog.height())
+        box_w = min(360, dialog.width() - 60)
+        box.setFixedWidth(box_w)
+        box.adjustSize()
+        bx = (dialog.width() - box_w) // 2
+        by = (dialog.height() - box.height()) // 2
+        box.move(bx, by)
+
+    dialog.resizeEvent = lambda e: _resize()
+
+    if parent:
+        dialog.resize(parent.size())
+        dialog.move(parent.mapToGlobal(parent.rect().topLeft()))
+    else:
+        dialog.resize(400, 200)
+
+    _resize()
+    return dialog.exec() == QDialog.Accepted
+
+
 def show_question_3way(parent, title, message):
     """
     Show a Yes/No/Cancel question modal.
