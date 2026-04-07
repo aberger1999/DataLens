@@ -92,11 +92,6 @@ class WorkspaceView(QWidget):
         self.dataset_manager_btn.clicked.connect(self.show_dataset_manager)
         header_layout.addWidget(self.dataset_manager_btn)
 
-        self.load_btn = QPushButton("Import CSV")
-        self.load_btn.setProperty("cssClass", "outline")
-        self.load_btn.clicked.connect(self.load_data)
-        header_layout.addWidget(self.load_btn)
-
         # Discard Changes button (left of Save)
         self.discard_btn = QPushButton("Discard Changes")
         self.discard_btn.setEnabled(False)
@@ -199,27 +194,13 @@ class WorkspaceView(QWidget):
         self.data_manager.clear_data()
 
         self.data_manager.set_workspace_path(workspace_path)
+        self.data_manager.set_workspace_name(workspace_name)
         self.visualization_panel.set_workspace_path(workspace_path)
         self.report_generator_panel.set_workspace_path(workspace_path)
 
         # Try to load existing workspace data
         self.data_manager.load_workspace_data()
         
-    def load_data(self):
-        """Load data from file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Load Data File",
-            "",
-            "Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)"
-        )
-        
-        if file_path:
-            if file_path.endswith('.csv'):
-                self.data_manager.load_csv(file_path)
-            elif file_path.endswith(('.xlsx', '.xls')):
-                self.data_manager.load_excel(file_path)
-                
     def save_data(self):
         """Save current data."""
         if self.data_manager.data is None:
@@ -274,29 +255,37 @@ class WorkspaceView(QWidget):
         self.update_save_button()
 
         if self.dataset_manager_dialog:
-            filename = os.path.basename(file_path)
-            self.dataset_manager_dialog.set_current_dataset(filename)
+            active = self.data_manager.active_working_copy
+            self.dataset_manager_dialog.set_current_dataset(active)
 
-    def on_dataset_deleted(self, filename):
-        """Handle dataset deletion."""
-        if self.data_manager.data is not None:
-            current_file = os.path.join(self.workspace_path, "data", "workspace_data.csv")
-            if os.path.exists(current_file):
-                self.data_manager.load_workspace_data()
+    def on_dataset_deleted(self, rel_path):
+        """Handle dataset deletion from the manager."""
+        active = self.data_manager.active_working_copy
+        if active is None:
+            # Active dataset was deleted — clear UI
+            self.data_manager.clear_data()
+            self.has_unsaved_changes = False
+            self.update_save_button()
 
-    def on_dataset_renamed(self, old_name, new_name):
+    def on_dataset_renamed(self, old_rel, new_rel):
         """Handle dataset rename."""
         pass
 
+    def on_workspace_reset(self):
+        """Handle workspace reset — all data cleared."""
+        self.has_unsaved_changes = False
+        self.update_save_button()
+
     def show_dataset_manager(self):
         """Show the dataset manager dialog."""
-        # Recreate each time so the dialog picks up the current theme
         self.dataset_manager_dialog = DatasetManagerDialog(self)
         self.dataset_manager_dialog.dataset_selected.connect(self.load_dataset_from_manager)
         self.dataset_manager_dialog.dataset_deleted.connect(self.on_dataset_deleted)
         self.dataset_manager_dialog.dataset_renamed.connect(self.on_dataset_renamed)
+        self.dataset_manager_dialog.workspace_reset.connect(self.on_workspace_reset)
 
-        self.dataset_manager_dialog.set_workspace(self.workspace_path)
+        self.dataset_manager_dialog.set_workspace(self.workspace_path, self.workspace_name)
+        self.dataset_manager_dialog.set_data_manager(self.data_manager)
         self.dataset_manager_dialog.exec()
 
     def mark_unsaved_changes(self):
@@ -369,8 +358,9 @@ class WorkspaceView(QWidget):
             self.has_unsaved_changes = False
             self.update_save_button()
 
-            if self.dataset_manager_dialog:
-                self.dataset_manager_dialog.set_current_dataset("workspace_data.csv")
+            if self.dataset_manager_dialog and self.data_manager.active_working_copy:
+                self.dataset_manager_dialog.set_current_dataset(
+                    self.data_manager.active_working_copy)
 
             modal.show_info(
                 self,
@@ -427,7 +417,7 @@ class WorkspaceView(QWidget):
         self._latest_df = df
         self.update_save_button()
         if self.dataset_manager_dialog:
-            self.dataset_manager_dialog.refresh_dataset_list()
+            self.dataset_manager_dialog.refresh()
 
         # Data preview is always visible – update immediately
         self.data_preview.on_data_loaded(df)
