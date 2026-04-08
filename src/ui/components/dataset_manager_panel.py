@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 from . import modal
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPoint, QEvent
 from PyQt5.QtGui import QFont, QColor, QCursor
+from ui.theme import get_colors, current_theme
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -29,12 +30,8 @@ def _format_size(size):
     return f"{size:.1f} TB"
 
 
-def _accent():
-    return "#6366f1"
-
-
-def _accent_hover():
-    return "#7577f5"
+def _colors():
+    return get_colors(current_theme())
 
 
 # ── Original Card (left column) ───────────────────────────────────────────
@@ -47,20 +44,21 @@ class OriginalCard(QWidget):
 
     def __init__(self, filename, file_path, imported_at=None, missing=False):
         super().__init__()
+        c = _colors()
         self.filename = filename
         self.file_path = file_path
         self.missing = missing
         self.setCursor(QCursor(Qt.PointingHandCursor))
 
-        border_color = "rgba(245,158,11,0.5)" if missing else "rgba(255,255,255,0.08)"
+        border_color = "rgba(245,158,11,0.5)" if missing else c['border']
         self.setStyleSheet(f"""
             OriginalCard {{
-                background: #1e2433;
+                background: {c['bg_input']};
                 border: 1px solid {border_color};
                 border-radius: 6px;
             }}
             OriginalCard:hover {{
-                border-color: rgba(255,255,255,0.18);
+                border-color: {c['border_medium']};
             }}
         """)
 
@@ -72,7 +70,7 @@ class OriginalCard(QWidget):
         if missing:
             warn = QLabel("\u26a0")
             warn.setToolTip("File not found on disk")
-            warn.setStyleSheet("color: #f59e0b; font-size: 14px; background: transparent; border: none;")
+            warn.setStyleSheet(f"color: {c['warning']}; font-size: 14px; background: transparent; border: none;")
             warn.setFixedWidth(18)
             layout.addWidget(warn, 0, Qt.AlignVCenter)
 
@@ -80,7 +78,7 @@ class OriginalCard(QWidget):
         info.setSpacing(2)
         info.setContentsMargins(0, 0, 0, 0)
 
-        name_color = "#8b8fa3" if missing else "#e2e4ed"
+        name_color = c['text_secondary'] if missing else c['text_primary']
         name_without_ext = os.path.splitext(filename)[0]
         name_label = QLabel(name_without_ext)
         name_label.setStyleSheet(f"color: {name_color}; font-size: 11px; font-weight: 600; background: transparent; border: none;")
@@ -100,7 +98,7 @@ class OriginalCard(QWidget):
             details_parts.append("File missing")
 
         details_label = QLabel("  \u00b7  ".join(details_parts))
-        details_label.setStyleSheet("color: #8b8fa3; font-size: 9px; background: transparent; border: none;")
+        details_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9px; background: transparent; border: none;")
         info.addWidget(details_label)
 
         layout.addLayout(info, 1)
@@ -113,8 +111,8 @@ class OriginalCard(QWidget):
         self.new_copy_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
-                border: 1px solid rgba(255,255,255,0.1);
+                color: {c['text_secondary']};
+                border: 1px solid {c['border']};
                 border-radius: 6px;
                 font-size: 16px;
                 font-weight: 600;
@@ -122,9 +120,9 @@ class OriginalCard(QWidget):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: {_accent()};
-                color: #ffffff;
-                border-color: {_accent()};
+                background: {c['accent']};
+                color: {c['text_inverse']};
+                border-color: {c['accent']};
             }}
         """)
         if missing:
@@ -137,20 +135,20 @@ class OriginalCard(QWidget):
         self.ctx_btn = QPushButton("\u22ee")
         self.ctx_btn.setFixedSize(28, 28)
         self.ctx_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.ctx_btn.setStyleSheet("""
-            QPushButton {
+        self.ctx_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
+                color: {c['text_secondary']};
                 border: none;
                 border-radius: 6px;
                 font-size: 16px;
                 padding: 0px;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(255,255,255,0.06);
-                color: #e2e4ed;
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['border_subtle']};
+                color: {c['text_primary']};
+            }}
         """)
         self.ctx_btn.clicked.connect(lambda: self.menu_requested.emit(self.filename))
         layout.addWidget(self.ctx_btn, 0, Qt.AlignVCenter)
@@ -167,15 +165,16 @@ class CopyCard(QWidget):
 
     def __init__(self, copy_rel_path, file_path, is_active=False, missing=False):
         super().__init__()
+        c = _colors()
         self.copy_rel_path = copy_rel_path
         self.file_path = file_path
         self.is_active = is_active
         self.missing = missing
         self.display_name = os.path.basename(copy_rel_path)
 
-        bg = "#232a3a" if is_active else "#1e2433"
-        left_border = f"border-left: 3px solid {_accent()};" if is_active else ""
-        border_color = "rgba(245,158,11,0.5)" if missing else "rgba(255,255,255,0.08)"
+        bg = c['bg_hover'] if is_active else c['bg_input']
+        left_border = f"border-left: 3px solid {c['accent']};" if is_active else ""
+        border_color = "rgba(245,158,11,0.5)" if missing else c['border']
 
         self.setStyleSheet(f"""
             CopyCard {{
@@ -193,7 +192,7 @@ class CopyCard(QWidget):
         if missing:
             warn = QLabel("\u26a0")
             warn.setToolTip("File not found on disk")
-            warn.setStyleSheet("color: #f59e0b; font-size: 14px; background: transparent; border: none;")
+            warn.setStyleSheet(f"color: {c['warning']}; font-size: 14px; background: transparent; border: none;")
             warn.setFixedWidth(18)
             layout.addWidget(warn, 0, Qt.AlignVCenter)
 
@@ -206,7 +205,7 @@ class CopyCard(QWidget):
         top_row.setSpacing(8)
         top_row.setContentsMargins(0, 0, 0, 0)
 
-        name_color = "#8b8fa3" if missing else "#e2e4ed"
+        name_color = c['text_secondary'] if missing else c['text_primary']
         name_without_ext = os.path.splitext(self.display_name)[0]
         name_label = QLabel(name_without_ext)
         name_label.setStyleSheet(f"color: {name_color}; font-size: 11px; font-weight: 600; background: transparent; border: none;")
@@ -218,7 +217,7 @@ class CopyCard(QWidget):
             badge = QLabel("ACTIVE")
             badge.setStyleSheet(f"""
                 QLabel {{
-                    color: {_accent()};
+                    color: {c['accent']};
                     font-size: 9px;
                     font-weight: 700;
                     letter-spacing: 1px;
@@ -240,7 +239,7 @@ class CopyCard(QWidget):
         if missing:
             details_parts.append("File missing")
         details_label = QLabel("  \u00b7  ".join(details_parts))
-        details_label.setStyleSheet("color: #8b8fa3; font-size: 9px; background: transparent; border: none;")
+        details_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 9px; background: transparent; border: none;")
         info.addWidget(details_label)
 
         layout.addLayout(info, 1)
@@ -250,24 +249,24 @@ class CopyCard(QWidget):
         self.load_btn.setFixedHeight(28)
         self.load_btn.setCursor(QCursor(Qt.PointingHandCursor))
         if is_active or missing:
-            self.load_btn.setStyleSheet("""
-                QPushButton {
+            self.load_btn.setStyleSheet(f"""
+                QPushButton {{
                     background: transparent;
-                    color: #4b5063;
-                    border: 1px solid rgba(255,255,255,0.06);
+                    color: {c['text_disabled']};
+                    border: 1px solid {c['border_subtle']};
                     border-radius: 6px;
                     padding: 4px 14px;
                     font-size: 11px;
                     font-weight: 600;
                     min-height: 0px;
-                }
+                }}
             """)
             self.load_btn.setEnabled(False)
         else:
             self.load_btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: {_accent()};
-                    color: #ffffff;
+                    background: {c['accent']};
+                    color: {c['text_inverse']};
                     border: none;
                     border-radius: 6px;
                     padding: 4px 14px;
@@ -276,7 +275,7 @@ class CopyCard(QWidget):
                     min-height: 0px;
                 }}
                 QPushButton:hover {{
-                    background: {_accent_hover()};
+                    background: {c['accent_hover']};
                 }}
             """)
         self.load_btn.clicked.connect(lambda: self.load_clicked.emit(self.copy_rel_path))
@@ -286,20 +285,20 @@ class CopyCard(QWidget):
         self.menu_btn = QPushButton("\u22ee")
         self.menu_btn.setFixedSize(28, 28)
         self.menu_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.menu_btn.setStyleSheet("""
-            QPushButton {
+        self.menu_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
+                color: {c['text_secondary']};
                 border: none;
                 border-radius: 6px;
                 font-size: 16px;
                 padding: 0px;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(255,255,255,0.06);
-                color: #e2e4ed;
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['border_subtle']};
+                color: {c['text_primary']};
+            }}
         """)
         self.menu_btn.clicked.connect(self._show_menu)
         layout.addWidget(self.menu_btn, 0, Qt.AlignVCenter)
@@ -334,21 +333,22 @@ class _TitleBar(QWidget):
 
     def __init__(self, parent_dialog):
         super().__init__()
+        c = _colors()
         self._dialog = parent_dialog
         self._drag_pos = None
         self.setFixedHeight(36)
-        self.setStyleSheet("background: #0f1117; border: none; border-top-left-radius: 10px; border-top-right-radius: 10px;")
+        self.setStyleSheet(f"background: {c['bg_base']}; border: none; border-top-left-radius: 10px; border-top-right-radius: 10px;")
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 0, 8, 0)
         layout.setSpacing(8)
 
         icon_label = QLabel("\u26c1")
-        icon_label.setStyleSheet("color: #6366f1; font-size: 14px; background: transparent; border: none;")
+        icon_label.setStyleSheet(f"color: {c['accent']}; font-size: 14px; background: transparent; border: none;")
         layout.addWidget(icon_label)
 
         title = QLabel("Dataset Manager")
-        title.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: 600; background: transparent; border: none;")
+        title.setStyleSheet(f"color: {c['text_inverse']}; font-size: 13px; font-weight: 600; background: transparent; border: none;")
         layout.addWidget(title)
 
         layout.addStretch()
@@ -358,20 +358,20 @@ class _TitleBar(QWidget):
         scan_btn.setFixedSize(28, 28)
         scan_btn.setCursor(QCursor(Qt.PointingHandCursor))
         scan_btn.setToolTip("Scan files — re-validate disk state")
-        scan_btn.setStyleSheet("""
-            QPushButton {
+        scan_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
+                color: {c['text_secondary']};
                 border: none;
                 border-radius: 6px;
                 font-size: 15px;
                 padding: 0px;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(255,255,255,0.08);
-                color: #e2e4ed;
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['border']};
+                color: {c['text_primary']};
+            }}
         """)
         scan_btn.clicked.connect(self.scan_clicked.emit)
         layout.addWidget(scan_btn)
@@ -379,20 +379,20 @@ class _TitleBar(QWidget):
         close_btn = QPushButton("\u2715")
         close_btn.setFixedSize(28, 28)
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        close_btn.setStyleSheet("""
-            QPushButton {
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
+                color: {c['text_secondary']};
                 border: none;
                 border-radius: 6px;
                 font-size: 13px;
                 padding: 0px;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: #ef4444;
-                color: #ffffff;
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['danger']};
+                color: {c['text_inverse']};
+            }}
         """)
         close_btn.clicked.connect(self.close_clicked.emit)
         layout.addWidget(close_btn)
@@ -433,12 +433,13 @@ class DatasetManagerDialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        self.setStyleSheet("""
-            DatasetManagerDialog {
-                background: #13161e;
-                border: 1px solid rgba(255,255,255,0.1);
+        c = _colors()
+        self.setStyleSheet(f"""
+            DatasetManagerDialog {{
+                background: {c['bg_primary']};
+                border: 1px solid {c['border']};
                 border-radius: 10px;
-            }
+            }}
         """)
 
         root = QVBoxLayout(self)
@@ -461,7 +462,7 @@ class DatasetManagerDialog(QDialog):
         left_col.setSpacing(8)
 
         left_header = QLabel("IMPORTED DATASETS")
-        left_header.setStyleSheet(f"color: {_accent()}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; background: transparent;")
+        left_header.setStyleSheet(f"color: {c['accent']}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; background: transparent;")
         left_col.addWidget(left_header)
 
         # Scroll area for original cards
@@ -492,15 +493,15 @@ class DatasetManagerDialog(QDialog):
         empty_l.addWidget(empty_icon)
         empty_text = QLabel("No datasets imported yet")
         empty_text.setAlignment(Qt.AlignCenter)
-        empty_text.setStyleSheet("color: #4b5063; font-size: 11px; background: transparent; border: none;")
+        empty_text.setStyleSheet(f"color: {c['text_disabled']}; font-size: 11px; background: transparent; border: none;")
         empty_l.addWidget(empty_text)
         self.left_empty_btn = QPushButton("+ Import Dataset")
         self.left_empty_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.left_empty_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
-                color: {_accent()};
-                border: 1px solid {_accent()};
+                color: {c['accent']};
+                border: 1px solid {c['accent']};
                 border-radius: 6px;
                 padding: 8px 18px;
                 font-size: 11px;
@@ -508,7 +509,7 @@ class DatasetManagerDialog(QDialog):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: rgba(99,102,241,0.12);
+                background: {c['accent_subtle']};
             }}
         """)
         self.left_empty_btn.clicked.connect(self.import_dataset)
@@ -523,8 +524,8 @@ class DatasetManagerDialog(QDialog):
         self.import_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
-                color: {_accent()};
-                border: 1px dashed {_accent()};
+                color: {c['accent']};
+                border: 1px dashed {c['accent']};
                 border-radius: 6px;
                 padding: 9px 0px;
                 font-size: 11px;
@@ -532,7 +533,7 @@ class DatasetManagerDialog(QDialog):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: rgba(99,102,241,0.10);
+                background: {c['accent_subtle']};
             }}
         """)
         self.import_btn.clicked.connect(self.import_dataset)
@@ -543,7 +544,7 @@ class DatasetManagerDialog(QDialog):
         # Vertical separator
         sep = QWidget()
         sep.setFixedWidth(1)
-        sep.setStyleSheet("background: rgba(255,255,255,0.08);")
+        sep.setStyleSheet(f"background: {c['border']};")
         body.addWidget(sep)
 
         # ── RIGHT COLUMN (working copies) ─────────────────────────────
@@ -551,36 +552,36 @@ class DatasetManagerDialog(QDialog):
         right_col.setSpacing(8)
 
         right_header = QLabel("WORKING COPIES")
-        right_header.setStyleSheet(f"color: {_accent()}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; background: transparent;")
+        right_header.setStyleSheet(f"color: {c['accent']}; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; background: transparent;")
         right_col.addWidget(right_header)
 
         self.right_sub_header = QLabel("")
-        self.right_sub_header.setStyleSheet("color: #8b8fa3; font-size: 10px; background: transparent;")
+        self.right_sub_header.setStyleSheet(f"color: {c['text_secondary']}; font-size: 10px; background: transparent;")
         right_col.addWidget(self.right_sub_header)
 
         # Pipeline guidance banner
         self.guidance_banner = QWidget()
-        self.guidance_banner.setStyleSheet("""
-            QWidget {
-                background: rgba(99,102,241,0.08);
-                border: 1px solid rgba(99,102,241,0.2);
+        self.guidance_banner.setStyleSheet(f"""
+            QWidget {{
+                background: {c['accent_subtle']};
+                border: 1px solid {c['accent_glow']};
                 border-radius: 6px;
-            }
+            }}
         """)
         banner_layout = QHBoxLayout(self.guidance_banner)
         banner_layout.setContentsMargins(12, 8, 12, 8)
         banner_layout.setSpacing(10)
         banner_text = QLabel("\U0001F4CB Ready to work? Create a working copy to keep your original data safe.")
         banner_text.setWordWrap(True)
-        banner_text.setStyleSheet("color: #a5b4fc; font-size: 11px; background: transparent; border: none;")
+        banner_text.setStyleSheet(f"color: {c['accent']}; font-size: 11px; background: transparent; border: none;")
         banner_layout.addWidget(banner_text, 1)
         self.banner_create_btn = QPushButton("+ Create Working Copy")
         self.banner_create_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.banner_create_btn.setFixedHeight(28)
         self.banner_create_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {_accent()};
-                color: #ffffff;
+                background: {c['accent']};
+                color: {c['text_inverse']};
                 border: none;
                 border-radius: 6px;
                 padding: 4px 14px;
@@ -589,7 +590,7 @@ class DatasetManagerDialog(QDialog):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: {_accent_hover()};
+                background: {c['accent_hover']};
             }}
         """)
         self.banner_create_btn.clicked.connect(self._on_banner_create)
@@ -620,15 +621,15 @@ class DatasetManagerDialog(QDialog):
         rempty.setAlignment(Qt.AlignCenter)
         rempty_text = QLabel("No working copies yet.\nClick + New Copy to create one.")
         rempty_text.setAlignment(Qt.AlignCenter)
-        rempty_text.setStyleSheet("color: #4b5063; font-size: 11px; background: transparent; border: none;")
+        rempty_text.setStyleSheet(f"color: {c['text_disabled']}; font-size: 11px; background: transparent; border: none;")
         rempty.addWidget(rempty_text)
         self.right_empty_btn = QPushButton("+ Create Working Copy")
         self.right_empty_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.right_empty_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
-                color: {_accent()};
-                border: 1px solid {_accent()};
+                color: {c['accent']};
+                border: 1px solid {c['accent']};
                 border-radius: 6px;
                 padding: 8px 18px;
                 font-size: 11px;
@@ -636,7 +637,7 @@ class DatasetManagerDialog(QDialog):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: rgba(99,102,241,0.12);
+                background: {c['accent_subtle']};
             }}
         """)
         self.right_empty_btn.clicked.connect(self._on_empty_create)
@@ -647,22 +648,22 @@ class DatasetManagerDialog(QDialog):
         # "Load Original Directly" button at bottom of right column
         self.load_original_btn = QPushButton("Load Original Directly \u2192")
         self.load_original_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.load_original_btn.setStyleSheet("""
-            QPushButton {
+        self.load_original_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #8b8fa3;
-                border: 1px solid rgba(255,255,255,0.1);
+                color: {c['text_secondary']};
+                border: 1px solid {c['border']};
                 border-radius: 6px;
                 padding: 7px 0px;
                 font-size: 11px;
                 font-weight: 500;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                color: #e2e4ed;
-                border-color: rgba(255,255,255,0.2);
-                background: rgba(255,255,255,0.03);
-            }
+            }}
+            QPushButton:hover {{
+                color: {c['text_primary']};
+                border-color: {c['border_medium']};
+                background: {c['accent_subtle']};
+            }}
         """)
         self.load_original_btn.clicked.connect(self._on_load_original)
         right_col.addWidget(self.load_original_btn)
@@ -678,20 +679,20 @@ class DatasetManagerDialog(QDialog):
         # Reset Workspace (left, de-emphasized, red-tinted)
         self.reset_btn = QPushButton("Reset Workspace")
         self.reset_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self.reset_btn.setStyleSheet("""
-            QPushButton {
+        self.reset_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #ef4444;
+                color: {c['danger']};
                 border: 1px solid rgba(239, 68, 68, 0.4);
                 border-radius: 6px;
                 padding: 7px 16px;
                 font-size: 10px;
                 font-weight: 600;
                 min-height: 0px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background: rgba(239, 68, 68, 0.08);
-            }
+            }}
         """)
         self.reset_btn.clicked.connect(self._on_reset_workspace)
         bottom.addWidget(self.reset_btn)
@@ -699,20 +700,20 @@ class DatasetManagerDialog(QDialog):
         bottom.addStretch()
         close_btn = QPushButton("Close")
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        close_btn.setStyleSheet("""
-            QPushButton {
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #e2e4ed;
-                border: 1px solid rgba(255,255,255,0.15);
+                color: {c['text_primary']};
+                border: 1px solid {c['border_medium']};
                 border-radius: 6px;
                 padding: 7px 24px;
                 font-size: 11px;
                 font-weight: 600;
                 min-height: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(255,255,255,0.06);
-            }
+            }}
+            QPushButton:hover {{
+                background: {c['border_subtle']};
+            }}
         """)
         close_btn.clicked.connect(self.accept)
         bottom.addWidget(close_btn)
@@ -840,6 +841,7 @@ class DatasetManagerDialog(QDialog):
         self._refresh_right()
 
     def _highlight_selected_original(self):
+        c = _colors()
         for i in range(self.left_layout.count()):
             item = self.left_layout.itemAt(i)
             w = item.widget()
@@ -847,21 +849,21 @@ class DatasetManagerDialog(QDialog):
                 if w.filename == self._selected_original:
                     w.setStyleSheet(f"""
                         OriginalCard {{
-                            background: #252b3b;
-                            border: 1px solid {_accent()};
+                            background: {c['bg_tertiary']};
+                            border: 1px solid {c['accent']};
                             border-radius: 6px;
                         }}
                     """)
                 else:
-                    border = "rgba(245,158,11,0.5)" if w.missing else "rgba(255,255,255,0.08)"
+                    border = "rgba(245,158,11,0.5)" if w.missing else c['border']
                     w.setStyleSheet(f"""
                         OriginalCard {{
-                            background: #1e2433;
+                            background: {c['bg_input']};
                             border: 1px solid {border};
                             border-radius: 6px;
                         }}
                         OriginalCard:hover {{
-                            border-color: rgba(255,255,255,0.18);
+                            border-color: {c['border_medium']};
                         }}
                     """)
 

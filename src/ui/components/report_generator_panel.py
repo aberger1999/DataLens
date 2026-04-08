@@ -28,7 +28,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import seaborn as sns
 import jinja2
 from ..theme import apply_dark_theme
-from ui.theme import get_colors
+from ui.theme import get_colors, current_theme
 import os
 import tempfile
 import base64
@@ -45,7 +45,7 @@ except (ImportError, OSError):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _colors():
-    return get_colors("dark")
+    return get_colors(current_theme())
 
 
 def _section_header(text):
@@ -79,7 +79,7 @@ def _input_style():
         QLineEdit, QTextEdit {{
             background-color: {c['bg_input']};
             color: {c['text_primary']};
-            border: 1px solid rgba(255,255,255,0.12);
+            border: 1px solid {c['border_medium']};
             border-radius: 6px;
             padding: 6px 10px;
             min-height: 22px;
@@ -177,6 +177,10 @@ class _ChipToggleGroup(QWidget):
     def is_checked(self, key):
         return key in self._selected
 
+    def refresh_styles(self):
+        for key, btn in self._chips.items():
+            btn.setStyleSheet(_chip_style(key in self._selected))
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Single-select chip row
@@ -214,6 +218,10 @@ class _SingleChipRow(QWidget):
 
     def selected(self):
         return self._selected
+
+    def refresh_styles(self):
+        for k, btn in self._btns.items():
+            btn.setStyleSheet(_chip_style(k == self._selected))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -258,8 +266,9 @@ class _ColorSwatchRow(QWidget):
         self.changed.emit(self.selected_color())
 
     def _repaint(self):
+        c = _colors()
         for key, (btn, colour) in self._btns.items():
-            ring = "2.5px solid #ffffff" if key == self._selected else "2px solid transparent"
+            ring = f"2.5px solid {c['text_primary']}" if key == self._selected else "2px solid transparent"
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {colour};
@@ -269,7 +278,7 @@ class _ColorSwatchRow(QWidget):
                     padding: 0px;
                 }}
                 QPushButton:hover {{
-                    border: 2.5px solid rgba(255,255,255,0.5);
+                    border: 2.5px solid {c['text_secondary']};
                 }}
             """)
 
@@ -407,7 +416,7 @@ class ReportGeneratorPanel(QWidget):
             QTextEdit {{
                 background-color: {c['bg_input']};
                 color: {c['text_primary']};
-                border: 1px solid rgba(255,255,255,0.12);
+                border: 1px solid {c['border_medium']};
                 border-radius: 6px;
                 padding: 8px 10px;
             }}
@@ -530,47 +539,47 @@ class ReportGeneratorPanel(QWidget):
                 border: none;
             }}
             QScrollBar:vertical {{
-                background: #0f1117;
+                background: {c['bg_base']};
                 width: 10px;
                 border-radius: 4px;
             }}
             QScrollBar::handle:vertical {{
-                background: #4b5563;
+                background: {c['scrollbar_handle']};
                 border-radius: 4px;
-                border: 2px solid #0f1117;
+                border: 2px solid {c['bg_base']};
                 min-height: 20px;
             }}
             QScrollBar::handle:vertical:hover {{
-                background: #6366f1;
+                background: {c['scrollbar_hover']};
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0px;
             }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
-                background: #0f1117;
+                background: {c['bg_base']};
             }}
             QScrollBar:horizontal {{
-                background: #0f1117;
+                background: {c['bg_base']};
                 height: 10px;
                 border-radius: 4px;
             }}
             QScrollBar::handle:horizontal {{
-                background: #4b5563;
+                background: {c['scrollbar_handle']};
                 border-radius: 4px;
-                border: 2px solid #0f1117;
+                border: 2px solid {c['bg_base']};
                 min-width: 20px;
             }}
             QScrollBar::handle:horizontal:hover {{
-                background: #6366f1;
+                background: {c['scrollbar_hover']};
             }}
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
                 width: 0px;
             }}
             QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
-                background: #0f1117;
+                background: {c['bg_base']};
             }}
             QScrollBar::corner {{
-                background: #0f1117;
+                background: {c['bg_base']};
             }}
         """)
 
@@ -619,6 +628,149 @@ class ReportGeneratorPanel(QWidget):
         right_lay.addWidget(self.preview_scroll)
 
         root.addWidget(right, 1)
+
+    # ── Theme Update ─────────────────────────────────────────────────────
+
+    def update_theme(self, theme_name=None):
+        """Re-apply inline styles for the current theme."""
+        c = _colors()
+
+        # Refresh chip/toggle selectors
+        self.font_chips.refresh_styles()
+        self.size_chips.refresh_styles()
+        self.page_style_chips.refresh_styles()
+        self.section_chips.refresh_styles()
+        self.accent_swatches._repaint()
+
+        # Labels
+        for lbl in self.findChildren(QLabel):
+            text = lbl.text()
+            ss = lbl.styleSheet()
+            if 'font-size: 11px' in ss and 'background: transparent' in ss:
+                lbl.setStyleSheet(f"color: {c['text_secondary']}; font-size: 11px; background: transparent;")
+
+        # Notes textarea
+        self.notes_edit.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {c['bg_input']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border_medium']};
+                border-radius: 6px;
+                padding: 8px 10px;
+            }}
+            QTextEdit:focus {{
+                border-color: {c['accent']};
+            }}
+        """)
+
+        # Title input
+        self.title_edit.setStyleSheet(_input_style())
+
+        # Generate Preview button
+        self.preview_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['accent']};
+                color: {c['text_inverse']};
+                border: none;
+                border-radius: 8px;
+                padding: 0px 16px;
+                font-size: 14px;
+                font-weight: 600;
+                min-height: 44px;
+                max-height: 44px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['accent_hover']};
+            }}
+            QPushButton:pressed {{
+                background-color: {c['accent_pressed']};
+            }}
+        """)
+
+        # Export buttons
+        export_style = f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {c['text_primary']};
+                border: 1px solid {c['border_medium']};
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 500;
+                min-height: 36px;
+                max-height: 36px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['bg_hover']};
+                border-color: {c['accent']};
+                color: {c['accent']};
+            }}
+        """
+        self.export_pdf_btn.setStyleSheet(export_style)
+        self.export_html_btn.setStyleSheet(export_style)
+
+        # Preview scroll area
+        self.preview_scroll.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {c['bg_base']};
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background: {c['bg_base']};
+                width: 10px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {c['scrollbar_handle']};
+                border-radius: 4px;
+                border: 2px solid {c['bg_base']};
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {c['scrollbar_hover']};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: {c['bg_base']};
+            }}
+            QScrollBar:horizontal {{
+                background: {c['bg_base']};
+                height: 10px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {c['scrollbar_handle']};
+                border-radius: 4px;
+                border: 2px solid {c['bg_base']};
+                min-width: 20px;
+            }}
+            QScrollBar::handle:horizontal:hover {{
+                background: {c['scrollbar_hover']};
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                width: 0px;
+            }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background: {c['bg_base']};
+            }}
+            QScrollBar::corner {{
+                background: {c['bg_base']};
+            }}
+        """)
+
+        # Preview container
+        self._preview_container.setStyleSheet(f"background-color: {c['bg_base']};")
+
+        # Apply preview card style (page style light/dark is separate from app theme)
+        self._apply_preview_card_style()
+
+        # Vertical separator
+        # The separator was set in init_ui — find it and re-style
+        for child in self.findChildren(QFrame):
+            if child.frameShape() == QFrame.VLine:
+                child.setStyleSheet(f"color: {c['border']}; max-width: 1px;")
+                break
 
     # ── Signal Connections ─────────────────────────────────────────────────
 

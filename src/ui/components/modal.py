@@ -12,8 +12,8 @@ from PyQt5.QtGui import QFont, QCursor
 
 
 def _colors():
-    from ui.theme import get_colors
-    return get_colors("dark")
+    from ui.theme import get_colors, current_theme
+    return get_colors(current_theme())
 
 
 def _build_modal(parent, title, message, buttons, accent_type="info"):
@@ -49,7 +49,7 @@ def _build_modal(parent, title, message, buttons, accent_type="info"):
 
     box.setStyleSheet(f"""
         QWidget {{
-            background-color: #1e2433;
+            background-color: {c['bg_input']};
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 10px;
             border-left: 3px solid {accent};
@@ -78,7 +78,7 @@ def _build_modal(parent, title, message, buttons, accent_type="info"):
     body_label.setWordWrap(True)
     body_label.setStyleSheet(f"""
         QLabel {{
-            color: #9ca3af;
+            color: {c['text_secondary']};
             font-size: 13px;
             background: transparent;
             border: none;
@@ -241,7 +241,7 @@ def show_discard_confirm(parent, title, message):
     box = QWidget(overlay)
     box.setStyleSheet(f"""
         QWidget {{
-            background-color: #1e2433;
+            background-color: {c['bg_input']};
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 10px;
             border-left: 3px solid {c['danger']};
@@ -268,7 +268,7 @@ def show_discard_confirm(parent, title, message):
     body_label.setWordWrap(True)
     body_label.setStyleSheet(f"""
         QLabel {{
-            color: #9ca3af;
+            color: {c['text_secondary']};
             font-size: 13px;
             background: transparent;
             border: none;
@@ -383,7 +383,7 @@ def show_import_duplicate(parent, filename):
     box = QWidget(overlay)
     box.setStyleSheet(f"""
         QWidget {{
-            background-color: #1e2433;
+            background-color: {c['bg_input']};
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 10px;
             border-left: 3px solid {c['warning']};
@@ -413,7 +413,7 @@ def show_import_duplicate(parent, filename):
     body_label.setWordWrap(True)
     body_label.setStyleSheet(f"""
         QLabel {{
-            color: #9ca3af;
+            color: {c['text_secondary']};
             font-size: 13px;
             background: transparent;
             border: none;
@@ -543,7 +543,7 @@ def show_load_original_warning(parent):
     box = QWidget(overlay)
     box.setStyleSheet(f"""
         QWidget {{
-            background-color: #1e2433;
+            background-color: {c['bg_input']};
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 10px;
             border-left: 3px solid {c['warning']};
@@ -573,7 +573,7 @@ def show_load_original_warning(parent):
     body_label.setWordWrap(True)
     body_label.setStyleSheet(f"""
         QLabel {{
-            color: #9ca3af;
+            color: {c['text_secondary']};
             font-size: 13px;
             background: transparent;
             border: none;
@@ -751,7 +751,7 @@ def show_reset_workspace(parent):
     box = QWidget(overlay)
     box.setStyleSheet(f"""
         QWidget {{
-            background-color: #1e2433;
+            background-color: {c['bg_input']};
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 10px;
             border-left: 3px solid {c['danger']};
@@ -778,7 +778,7 @@ def show_reset_workspace(parent):
     body_label.setWordWrap(True)
     body_label.setStyleSheet("""
         QLabel {
-            color: #9ca3af;
+            color: {c['text_secondary']};
             font-size: 13px;
             background: transparent;
             border: none;
@@ -791,7 +791,7 @@ def show_reset_workspace(parent):
     text_input.setPlaceholderText("Type RESET here")
     text_input.setStyleSheet(f"""
         QLineEdit {{
-            background-color: #131620;
+            background-color: {c['bg_primary']};
             color: {c['text_primary']};
             border: 1px solid {c['border_medium']};
             border-radius: 6px;
@@ -849,8 +849,8 @@ def show_reset_workspace(parent):
             background-color: rgba(239,68,68,0.15);
         }}
         QPushButton:disabled {{
-            color: #4b5063;
-            border-color: rgba(255,255,255,0.08);
+            color: {c['text_disabled']};
+            border-color: {c['border_subtle']};
         }}
     """)
     confirm_btn.clicked.connect(dialog.accept)

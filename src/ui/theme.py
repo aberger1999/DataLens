@@ -120,6 +120,14 @@ LIGHT = {
 
 PALETTES = {"dark": DARK, "light": LIGHT}
 
+# Currently active theme (updated by apply_theme)
+_current_theme = "dark"
+
+
+def current_theme() -> str:
+    """Return the name of the currently active theme."""
+    return _current_theme
+
 
 # ── Font ───────────────────────────────────────────────────────────────────
 
@@ -717,6 +725,9 @@ def build_palette(theme: str = "dark") -> QPalette:
 
 def apply_theme(theme: str = "dark"):
     """Apply the given theme to the entire application."""
+    global _current_theme
+    _current_theme = theme
+
     app = QApplication.instance()
     if app is None:
         return

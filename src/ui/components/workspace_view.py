@@ -19,7 +19,7 @@ from .machine_learning_panel import MachineLearningPanel
 from .report_generator_panel import ReportGeneratorPanel
 from .dataset_manager_panel import DatasetManagerDialog
 from ..data_manager import DataManager
-from ..theme import get_colors, RADIUS_MD, RADIUS_LG
+from ..theme import get_colors, current_theme, RADIUS_MD, RADIUS_LG
 
 class WorkspaceView(QWidget):
     """View for working within a specific workspace."""
@@ -51,9 +51,18 @@ class WorkspaceView(QWidget):
             }}
         """)
 
+        # Discard button
+        self._apply_discard_btn_style()
+
         # Update child panels
         if hasattr(self, 'analysis_panel'):
             self.analysis_panel.update_theme(theme_name)
+        if hasattr(self, 'feature_engineering_panel'):
+            self.feature_engineering_panel.update_theme(theme_name)
+        if hasattr(self, 'machine_learning_panel'):
+            self.machine_learning_panel.update_theme(theme_name)
+        if hasattr(self, 'report_generator_panel'):
+            self.report_generator_panel.update_theme(theme_name)
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -295,34 +304,35 @@ class WorkspaceView(QWidget):
 
     def _apply_discard_btn_style(self):
         """Apply the correct style to the discard button based on state."""
+        c = get_colors(current_theme())
         if self.discard_btn.isEnabled():
             self.discard_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.discard_btn.setStyleSheet("""
-                QPushButton {
+            self.discard_btn.setStyleSheet(f"""
+                QPushButton {{
                     background-color: transparent;
-                    color: #e2e4ed;
-                    border: 1px solid rgba(255,255,255,0.25);
+                    color: {c['text_primary']};
+                    border: 1px solid {c['border_medium']};
                     padding: 7px 16px;
                     border-radius: 6px;
                     min-height: 20px;
                     font-weight: 500;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255,255,255,0.06);
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {c['bg_hover']};
+                }}
             """)
         else:
             self.discard_btn.setCursor(Qt.CursorShape.ForbiddenCursor)
-            self.discard_btn.setStyleSheet("""
-                QPushButton {
+            self.discard_btn.setStyleSheet(f"""
+                QPushButton {{
                     background-color: transparent;
-                    color: #6b7280;
-                    border: 1px solid rgba(255,255,255,0.08);
+                    color: {c['text_disabled']};
+                    border: 1px solid {c['border_subtle']};
                     padding: 7px 16px;
                     border-radius: 6px;
                     min-height: 20px;
                     font-weight: 500;
-                }
+                }}
             """)
 
     def update_save_button(self):

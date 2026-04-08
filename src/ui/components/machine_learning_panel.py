@@ -32,14 +32,14 @@ from sklearn.svm import SVC, SVR
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from ui.theme import get_colors, apply_dark_theme
+from ui.theme import get_colors, apply_dark_theme, current_theme
 from ui.components import modal
 
 
 # ── Shared styling helpers ─────────────────────────────────────────────────
 
 def _colors():
-    return get_colors("dark")
+    return get_colors(current_theme())
 
 
 def _section_header(text):
@@ -73,7 +73,7 @@ def _input_style():
         QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
             background-color: {c['bg_input']};
             color: {c['text_primary']};
-            border: 1px solid rgba(255,255,255,0.12);
+            border: 1px solid {c['border_medium']};
             border-radius: 6px;
             padding: 6px 10px;
             min-height: 22px;
@@ -127,7 +127,7 @@ def _card_style(selected=False):
     if selected:
         return f"""
             QPushButton {{
-                background-color: rgba(99,102,241,0.15);
+                background-color: {c['accent_subtle']};
                 color: {c['text_primary']};
                 border: 1.5px solid {c['accent']};
                 border-radius: 8px;
@@ -154,7 +154,7 @@ def _card_style(selected=False):
             QPushButton:hover {{
                 background-color: {c['bg_hover']};
                 color: {c['text_primary']};
-                border-color: rgba(99,102,241,0.4);
+                border-color: {c['accent_glow']};
             }}
         """
 
@@ -288,6 +288,10 @@ class ChipSelector(QWidget):
             self._chips[name].setStyleSheet(_chip_style(False))
         self.selection_changed.emit()
 
+    def refresh_styles(self):
+        for n, btn in self._chips.items():
+            btn.setStyleSheet(_chip_style(n in self._selected))
+
 
 # ── Card selector (single select) ─────────────────────────────────────────
 
@@ -338,6 +342,11 @@ class CardSelector(QWidget):
     def select(self, key):
         self._on_clicked(key)
 
+    def refresh_styles(self):
+        for k, btn in self._cards.items():
+            sel = k == self._selected
+            btn.setStyleSheet(_card_style(sel) + "QPushButton { text-align: center; }")
+
 
 # ── Segmented button group ────────────────────────────────────────────────
 
@@ -372,6 +381,10 @@ class SegmentedButtons(QWidget):
 
     def select(self, key):
         self._on_clicked(key)
+
+    def refresh_styles(self):
+        for k, btn in self._buttons.items():
+            btn.setStyleSheet(_chip_style(k == self._selected))
 
 
 # ── Metric stat card ──────────────────────────────────────────────────────
@@ -464,6 +477,27 @@ class MetricCard(QWidget):
             }}
         """)
 
+    def refresh_styles(self):
+        c = _colors()
+        self._name_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['text_secondary']};
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.8px;
+                padding: 0;
+                background: transparent;
+            }}
+        """)
+        self.setStyleSheet(f"""
+            MetricCard {{
+                background-color: {c['bg_tertiary']};
+                border: 1px solid {c['border']};
+                border-radius: 8px;
+            }}
+        """)
+        self.reset()
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN PANEL
@@ -498,6 +532,117 @@ class MachineLearningPanel(QWidget):
         tabs.addTab(self._build_evaluation_tab(), "Model Evaluation")
         tabs.addTab(self._build_predictions_tab(), "Predictions")
         layout.addWidget(tabs)
+
+    def update_theme(self, theme_name=None):
+        """Re-apply inline styles for the current theme."""
+        c = _colors()
+
+        # Refresh chip/card/segmented selectors
+        self.target_chips.refresh_styles()
+        self.features_chips.refresh_styles()
+        self.problem_type_btns.refresh_styles()
+        self.model_cards.refresh_styles()
+        self.cv_btns.refresh_styles()
+        self.scaling_btns.refresh_styles()
+        self.pred_method_btns.refresh_styles()
+
+        # Metric cards
+        for card in (self.metric_card_1, self.metric_card_2,
+                     self.metric_card_3, self.metric_card_4):
+            card.refresh_styles()
+
+        # Footer buttons
+        self.train_btn.setStyleSheet(_footer_btn_style())
+        self.evaluate_btn.setStyleSheet(_footer_btn_style() if self.evaluate_btn.isEnabled() else _footer_btn_disabled_style())
+
+        # Input fields
+        self.test_size_spin.setStyleSheet(_input_style())
+
+        # Features count label
+        self._features_count_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['accent']};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 0;
+                background: transparent;
+            }}
+        """)
+
+        # Test size badge
+        self._test_size_badge.setStyleSheet(f"""
+            QLabel {{
+                color: {c['text_primary']};
+                background: {c['bg_tertiary']};
+                border: 1px solid {c['border']};
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 4px;
+            }}
+        """)
+
+        # Test size slider
+        self.test_size_slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
+                background: {c['bg_input']};
+                height: 6px;
+                border-radius: 3px;
+                border: 1px solid {c['border_medium']};
+            }}
+            QSlider::handle:horizontal {{
+                background: {c['accent']};
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {c['accent']};
+                border-radius: 3px;
+            }}
+        """)
+
+        # CV table
+        self.cv_table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {c['bg_input']};
+                alternate-background-color: {c['table_alt']};
+                border: 1px solid {c['border']};
+                border-radius: 6px;
+                gridline-color: {c['table_grid']};
+            }}
+            QHeaderView::section {{
+                background-color: {c['table_header']};
+                color: {c['text_secondary']};
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                padding: 6px 8px;
+                border: none;
+                border-bottom: 2px solid {c['accent']};
+            }}
+        """)
+
+        # Feature importance chart frame
+        fi_frame = self.importance_canvas.parent()
+        if fi_frame:
+            fi_frame.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['bg_input']};
+                    border: 1px solid {c['border']};
+                    border-radius: 6px;
+                }}
+            """)
+
+        # Result card
+        self._result_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {c['bg_tertiary']};
+                border: 1.5px solid {c['accent']};
+                border-radius: 10px;
+            }}
+        """)
 
     # ── TAB 1: Model Training ──────────────────────────────────────────────
 
@@ -573,7 +718,7 @@ class MachineLearningPanel(QWidget):
                 background: {c['bg_input']};
                 height: 6px;
                 border-radius: 3px;
-                border: 1px solid rgba(255,255,255,0.12);
+                border: 1px solid {c['border_medium']};
             }}
             QSlider::handle:horizontal {{
                 background: {c['accent']};
@@ -723,7 +868,8 @@ class MachineLearningPanel(QWidget):
 
         # ─ Feature importance chart ─
         body_lay.addWidget(_section_header("Feature Importance"))
-        self.importance_figure = plt.figure(facecolor='#0f1117')
+        c = _colors()
+        self.importance_figure = plt.figure(facecolor=c['bg_base'])
         self.importance_canvas = FigureCanvas(self.importance_figure)
         self.importance_canvas.setMinimumHeight(250)
         fi_frame = QFrame()

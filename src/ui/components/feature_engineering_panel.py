@@ -17,15 +17,15 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from datetime import datetime
 
-from ui.theme import get_colors
+from ui.theme import get_colors, current_theme
 from ui.components import modal
 
 
 # ── Shared styling helpers ─────────────────────────────────────────────────
 
 def _colors():
-    """Get current dark theme colors."""
-    return get_colors("dark")
+    """Get current theme colors."""
+    return get_colors(current_theme())
 
 
 def _section_header(text):
@@ -61,7 +61,7 @@ def _input_style():
         QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
             background-color: {c['bg_input']};
             color: {c['text_primary']};
-            border: 1px solid rgba(255,255,255,0.12);
+            border: 1px solid {c['border_medium']};
             border-radius: 6px;
             padding: 6px 10px;
             min-height: 22px;
@@ -120,7 +120,7 @@ def _card_style(selected=False):
     if selected:
         return f"""
             QPushButton {{
-                background-color: rgba(99,102,241,0.15);
+                background-color: {c['accent_subtle']};
                 color: {c['text_primary']};
                 border: 1.5px solid {c['accent']};
                 border-radius: 8px;
@@ -145,7 +145,7 @@ def _card_style(selected=False):
             QPushButton:hover {{
                 background-color: {c['bg_hover']};
                 color: {c['text_primary']};
-                border-color: rgba(99,102,241,0.4);
+                border-color: {c['accent_glow']};
             }}
         """
 
@@ -251,6 +251,10 @@ class ChipSelector(QWidget):
             btn.setStyleSheet(_chip_style(False))
         self.selection_changed.emit()
 
+    def refresh_styles(self):
+        for n, btn in self._chips.items():
+            btn.setStyleSheet(_chip_style(n in self._selected))
+
 
 # ── Toggle chip selector (for datetime features etc.) ─────────────────────
 
@@ -292,6 +296,10 @@ class ToggleChipSelector(QWidget):
             self._chips[key] = (btn, checked)
             btn.setStyleSheet(_toggle_chip_style(checked))
 
+    def refresh_styles(self):
+        for key, (btn, state) in self._chips.items():
+            btn.setStyleSheet(_toggle_chip_style(state))
+
 
 # ── Card selector (for operations / methods) ──────────────────────────────
 
@@ -332,6 +340,10 @@ class CardSelector(QWidget):
     def select(self, key):
         """Programmatically select a card."""
         self._on_clicked(key)
+
+    def refresh_styles(self):
+        for k, btn in self._cards.items():
+            btn.setStyleSheet(_card_style(k == self._selected))
 
 
 # ── Encoding method card (wider, with description + tooltip) ──────────────
@@ -391,6 +403,10 @@ class EncodingCardSelector(QWidget):
     def selected(self):
         return self._selected
 
+    def refresh_styles(self):
+        for k, btn in self._cards.items():
+            btn.setStyleSheet(_card_style(k == self._selected) + "QPushButton { text-align: center; }")
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN PANEL
@@ -421,6 +437,81 @@ class FeatureEngineeringPanel(QWidget):
         tabs.addTab(self._build_datetime_tab(), "DateTime Features")
         tabs.addTab(self._build_combination_tab(), "Feature Combinations")
         layout.addWidget(tabs)
+
+    def update_theme(self, theme_name=None):
+        """Re-apply inline styles for the current theme."""
+        c = _colors()
+
+        # Refresh all chip/card selector widgets
+        for selector in (self.numeric_chip_selector, self.second_chip_selector,
+                         self.cat_chip_selector, self.dt_chip_selector,
+                         self.combine_chip_selector):
+            selector.refresh_styles()
+
+        self.numeric_ops_cards.refresh_styles()
+        self.combine_method_cards.refresh_styles()
+        self.encoding_cards.refresh_styles()
+        self.dt_toggle_chips.refresh_styles()
+
+        # Poly degree chips
+        self._poly_deg2.setStyleSheet(_chip_style(self._poly_degree == 2))
+        self._poly_deg3.setStyleSheet(_chip_style(self._poly_degree == 3))
+
+        # Footer buttons
+        for btn in (self.apply_numeric_btn, self.apply_cat_btn,
+                    self.apply_dt_btn, self.apply_combine_btn):
+            btn.setStyleSheet(_footer_btn_style())
+
+        # Input fields
+        for inp in (self.power_spin, self.bins_spin, self.numeric_name_edit,
+                    self.rare_threshold_spin, self.target_col_combo,
+                    self.concat_separator_edit, self.combine_name_edit):
+            inp.setStyleSheet(_input_style())
+
+        # Labels with inline styles
+        self._cat_preview_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['text_secondary']};
+                font-size: 11px;
+                padding: 4px 8px;
+                background: {c['bg_input']};
+                border: 1px solid {c['border']};
+                border-radius: 6px;
+            }}
+        """)
+
+        self._dt_empty_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['text_disabled']};
+                font-size: 13px;
+                padding: 30px;
+                background: transparent;
+            }}
+        """)
+
+        self._combine_count_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['accent']};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 0;
+                background: transparent;
+            }}
+        """)
+
+        self._combine_preview_label.setStyleSheet(f"""
+            QLabel {{
+                color: {c['text_secondary']};
+                font-size: 11px;
+                padding: 8px;
+                background: {c['bg_input']};
+                border: 1px solid {c['border']};
+                border-radius: 6px;
+                font-family: monospace;
+            }}
+        """)
+
+        self._ratio_warning.setStyleSheet(f"color: {c['warning']}; font-size: 11px; padding: 0; background: transparent;")
 
     # ── TAB 1: Numeric Features ────────────────────────────────────────────
 
