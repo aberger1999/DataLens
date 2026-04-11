@@ -57,6 +57,8 @@ class WorkspaceView(QWidget):
         # Update child panels
         if hasattr(self, 'analysis_panel'):
             self.analysis_panel.update_theme(theme_name)
+        if hasattr(self, 'visualization_panel'):
+            self.visualization_panel.update_theme(theme_name)
         if hasattr(self, 'feature_engineering_panel'):
             self.feature_engineering_panel.update_theme(theme_name)
         if hasattr(self, 'machine_learning_panel'):

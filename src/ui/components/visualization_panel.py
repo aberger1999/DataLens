@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import os
-from ..theme import apply_dark_theme
+from ..theme import apply_dark_theme, apply_chart_theme, current_theme
 
 
 class _StyledSplitterHandle(QWidget):
@@ -484,6 +484,10 @@ class VisualizationPanel(QWidget):
         self.custom_color = None
         self.color_map = None
 
+        # Chart theme tracking
+        self._chart_theme = current_theme()
+        self.chart_bg_override = None  # None = follow theme
+
         # Store selected series for multi-series plots
         self.selected_series = []
 
@@ -623,9 +627,6 @@ class VisualizationPanel(QWidget):
             "Inferno",
             "Magma",
             "Cividis",
-            "Blues",
-            "Reds",
-            "Greens",
             "Custom"
         ])
         style_layout.addWidget(color_theme_label, 2, 0)
@@ -635,6 +636,25 @@ class VisualizationPanel(QWidget):
         self.color_button = QPushButton("Choose Color")
         self.color_button.setEnabled(False)
         style_layout.addWidget(self.color_button, 3, 1)
+
+        # Chart background
+        chart_bg_label = QLabel("Chart Background:")
+        bg_row = QHBoxLayout()
+        bg_row.setContentsMargins(0, 0, 0, 0)
+        bg_row.setSpacing(8)
+        self.chart_bg_button = QPushButton("Auto (theme)")
+        self.chart_bg_button.setToolTip(
+            "Pick a custom background color for the chart"
+        )
+        self.chart_bg_reset_btn = QPushButton("Reset")
+        self.chart_bg_reset_btn.setToolTip("Reset to theme default")
+        # Equal width so neither button clips its label
+        bg_row.addWidget(self.chart_bg_button, 1)
+        bg_row.addWidget(self.chart_bg_reset_btn, 1)
+        bg_row_widget = QWidget()
+        bg_row_widget.setLayout(bg_row)
+        style_layout.addWidget(chart_bg_label, 4, 0)
+        style_layout.addWidget(bg_row_widget, 4, 1)
 
         # Trend line / fit options
         trend_group = QGroupBox("Trend Line / Fit")
@@ -664,7 +684,7 @@ class VisualizationPanel(QWidget):
         self.show_equation_check.setChecked(False)
         trend_layout.addWidget(self.show_equation_check, 3, 0, 1, 2)
 
-        style_layout.addWidget(trend_group, 3, 0, 1, 2)
+        style_layout.addWidget(trend_group, 5, 0, 1, 2)
 
         # Additional options
         options_group = QGroupBox("Display Options")
@@ -682,7 +702,7 @@ class VisualizationPanel(QWidget):
         self.data_labels_check.setChecked(False)
         options_layout.addWidget(self.data_labels_check, 1, 0, 1, 2)
 
-        style_layout.addWidget(options_group, 5, 0, 1, 2)
+        style_layout.addWidget(options_group, 6, 0, 1, 2)
 
         controls_tabs.addTab(style_tab, "Style")
 
@@ -869,31 +889,9 @@ class VisualizationPanel(QWidget):
         toolbar_row = QHBoxLayout()
         toolbar_row.setContentsMargins(4, 2, 4, 2)
 
-        # Style the matplotlib toolbar for dark theme
-        self.toolbar.setStyleSheet("""
-            QToolBar {
-                background: transparent;
-                border: none;
-                spacing: 2px;
-            }
-            QToolButton {
-                background-color: transparent;
-                border: 1px solid transparent;
-                border-radius: 4px;
-                padding: 4px;
-                min-width: 28px;
-                min-height: 28px;
-            }
-            QToolButton:hover {
-                background-color: rgba(99,102,241,0.18);
-                border-color: rgba(99,102,241,0.3);
-            }
-            QToolButton:checked, QToolButton:pressed {
-                background-color: rgba(99,102,241,0.25);
-                border-color: rgba(99,102,241,0.5);
-            }
-        """)
-        # Recolor toolbar icons for dark background
+        # Style the matplotlib toolbar based on the current theme
+        self._apply_toolbar_theme(self._chart_theme)
+        # Recolor toolbar icons to match the current theme
         self._recolor_toolbar_icons()
         # Replace matplotlib's built-in Configure Subplots dialog with our custom one
         self._install_configure_layout_override()
@@ -905,22 +903,7 @@ class VisualizationPanel(QWidget):
         self.expand_btn.setFixedSize(32, 32)
         self.expand_btn.setToolTip("Expand to full view")
         self.expand_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.expand_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #cbd5e1;
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 4px;
-                font-size: 18px;
-                padding: 0px;
-                min-height: 0px;
-            }
-            QPushButton:hover {
-                background-color: rgba(99,102,241,0.22);
-                border-color: rgba(99,102,241,0.5);
-                color: #a5b4fc;
-            }
-        """)
+        self._apply_expand_btn_theme(self._chart_theme)
         self.expand_btn.clicked.connect(self._open_fullscreen_chart)
         toolbar_row.addWidget(self.expand_btn)
 
@@ -973,6 +956,8 @@ class VisualizationPanel(QWidget):
         self.style_combo.currentTextChanged.connect(self.schedule_update)
         self.color_combo.currentTextChanged.connect(self.on_color_theme_changed)
         self.color_button.clicked.connect(self.choose_custom_color)
+        self.chart_bg_button.clicked.connect(self.choose_chart_background)
+        self.chart_bg_reset_btn.clicked.connect(self.reset_chart_background)
         self.grid_check.stateChanged.connect(self.schedule_update)
         self.legend_check.stateChanged.connect(self.schedule_update)
         self.alpha_slider.valueChanged.connect(self.schedule_update)
@@ -1042,6 +1027,41 @@ class VisualizationPanel(QWidget):
             self.custom_color = (color.red()/255, color.green()/255, color.blue()/255)
             self.schedule_update()
 
+    def choose_chart_background(self):
+        """Open a color dialog to pick a custom chart background color."""
+        initial = QColor(self.chart_bg_override) if self.chart_bg_override \
+            else QColor("#ffffff")
+        color = QColorDialog.getColor(initial, self, "Chart Background Color")
+        if color.isValid():
+            self.chart_bg_override = color.name()
+            self._refresh_chart_bg_button()
+            self.schedule_update()
+
+    def reset_chart_background(self):
+        """Clear the custom chart background so it follows the app theme."""
+        self.chart_bg_override = None
+        self._refresh_chart_bg_button()
+        self.schedule_update()
+
+    def _refresh_chart_bg_button(self):
+        """Update the chart-background button's label + swatch."""
+        if self.chart_bg_override:
+            col = self.chart_bg_override
+            # Contrast-aware text color
+            qc = QColor(col)
+            luminance = (0.299 * qc.red() + 0.587 * qc.green()
+                         + 0.114 * qc.blue()) / 255.0
+            fg = "#000000" if luminance > 0.55 else "#ffffff"
+            self.chart_bg_button.setText(f"  {col}")
+            self.chart_bg_button.setStyleSheet(
+                f"QPushButton {{ background-color: {col}; color: {fg}; "
+                f"border: 1px solid rgba(0,0,0,0.2); text-align: left; "
+                f"padding-left: 10px; }}"
+            )
+        else:
+            self.chart_bg_button.setText("Auto (theme)")
+            self.chart_bg_button.setStyleSheet("")
+
     def schedule_update(self):
         """Schedule a visualization update with a delay to prevent rapid updates."""
         self.update_timer.start(300)  # 300ms delay
@@ -1049,10 +1069,14 @@ class VisualizationPanel(QWidget):
     # ── Toolbar icon recoloring ────────────────────────────────────────────
 
     def _recolor_toolbar_icons(self):
-        """Recolor matplotlib NavigationToolbar icons so they are visible on
-        the dark background.  Each QToolButton icon is repainted with a light
-        tint (#cbd5e1)."""
-        target_color = QColor("#cbd5e1")
+        """Recolor matplotlib NavigationToolbar icons to match the current
+        theme.  Light theme uses a dark slate tint so the icons are clearly
+        visible against a light toolbar background; dark theme uses a pale
+        tint."""
+        if self._chart_theme == "light":
+            target_color = QColor("#334155")
+        else:
+            target_color = QColor("#cbd5e1")
         for action in self.toolbar.actions():
             icon = action.icon()
             if icon.isNull():
@@ -1071,6 +1095,121 @@ class VisualizationPanel(QWidget):
             p.fillRect(painted.rect(), target_color)
             p.end()
             action.setIcon(QIcon(painted))
+
+    def _apply_toolbar_theme(self, theme: str):
+        """Apply theme-appropriate QSS to the matplotlib NavigationToolbar.
+
+        Light theme uses a darker neutral button fill so the icons contrast
+        against the light panel; dark theme stays transparent with the
+        indigo accent on hover."""
+        if theme == "light":
+            self.toolbar.setStyleSheet("""
+                QToolBar {
+                    background: transparent;
+                    border: none;
+                    spacing: 2px;
+                }
+                QToolButton {
+                    background-color: #e2e4ec;
+                    color: #1a1b2e;
+                    border: 1px solid rgba(0,0,0,0.18);
+                    border-radius: 4px;
+                    padding: 4px;
+                    min-width: 28px;
+                    min-height: 28px;
+                }
+                QToolButton:hover {
+                    background-color: #d1d4e0;
+                    border-color: #6366f1;
+                }
+                QToolButton:checked, QToolButton:pressed {
+                    background-color: #c3c7d8;
+                    border-color: #6366f1;
+                }
+            """)
+        else:
+            self.toolbar.setStyleSheet("""
+                QToolBar {
+                    background: transparent;
+                    border: none;
+                    spacing: 2px;
+                }
+                QToolButton {
+                    background-color: transparent;
+                    border: 1px solid transparent;
+                    border-radius: 4px;
+                    padding: 4px;
+                    min-width: 28px;
+                    min-height: 28px;
+                }
+                QToolButton:hover {
+                    background-color: rgba(99,102,241,0.18);
+                    border-color: rgba(99,102,241,0.3);
+                }
+                QToolButton:checked, QToolButton:pressed {
+                    background-color: rgba(99,102,241,0.25);
+                    border-color: rgba(99,102,241,0.5);
+                }
+            """)
+
+    def _apply_expand_btn_theme(self, theme: str):
+        """Apply theme-appropriate QSS to the expand/pop-out button."""
+        if theme == "light":
+            self.expand_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e2e4ec;
+                    color: #1a1b2e;
+                    border: 1px solid rgba(0,0,0,0.18);
+                    border-radius: 4px;
+                    font-size: 18px;
+                    padding: 0px;
+                    min-height: 0px;
+                }
+                QPushButton:hover {
+                    background-color: #d1d4e0;
+                    border-color: #6366f1;
+                    color: #4345b0;
+                }
+            """)
+        else:
+            self.expand_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #cbd5e1;
+                    border: 1px solid rgba(255,255,255,0.12);
+                    border-radius: 4px;
+                    font-size: 18px;
+                    padding: 0px;
+                    min-height: 0px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(99,102,241,0.22);
+                    border-color: rgba(99,102,241,0.5);
+                    color: #a5b4fc;
+                }
+            """)
+
+    def update_theme(self, theme_name: str):
+        """Update visualization panel chrome + chart to match the app theme."""
+        self._chart_theme = theme_name
+        # Restyle the matplotlib toolbar + expand button
+        if hasattr(self, 'toolbar'):
+            self._apply_toolbar_theme(theme_name)
+            self._recolor_toolbar_icons()
+        if hasattr(self, 'expand_btn'):
+            self._apply_expand_btn_theme(theme_name)
+        # Re-render the current chart with the new theme background
+        if self.figure.get_axes():
+            self.update_visualization()
+        else:
+            # No chart yet — just repaint the figure patch so the empty
+            # canvas matches the new theme.
+            from ..theme import apply_chart_theme as _act
+            ax = self.figure.add_subplot(111)
+            _act(self.figure, ax, theme=theme_name,
+                 bg_override=self.chart_bg_override)
+            self.figure.delaxes(ax)
+            self.canvas.draw_idle()
 
     def _install_configure_layout_override(self):
         """Redirect matplotlib's Configure Subplots action to our custom dialog.
@@ -1789,8 +1928,12 @@ class VisualizationPanel(QWidget):
                 if len(handles) > 0:
                     ax.legend(loc='best', fontsize=max(6, font_size - 1))
 
-            # Apply dark theme to all chart elements
-            apply_dark_theme(self.figure, ax)
+            # Apply theme-aware styling to all chart elements
+            apply_chart_theme(
+                self.figure, ax,
+                theme=self._chart_theme,
+                bg_override=self.chart_bg_override,
+            )
 
             # Adjust layout to prevent label cutoff
             self.figure.tight_layout()
@@ -1802,7 +1945,11 @@ class VisualizationPanel(QWidget):
             ax.text(0.5, 0.5, f"Error: {str(e)}",
                    ha='center', va='center', color='red',
                    transform=ax.transAxes)
-            apply_dark_theme(self.figure, ax)
+            apply_chart_theme(
+                self.figure, ax,
+                theme=self._chart_theme,
+                bg_override=self.chart_bg_override,
+            )
 
         # Redraw the canvas
         self.canvas.draw()

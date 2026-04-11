@@ -10,7 +10,8 @@
       "Bash(python -m py_compile src/main.py)",
       "Bash(python -m py_compile src/ui/main_window.py)",
       "Bash(python -m py_compile src/ui/components/home_screen.py)",
-      "Bash(python -m py_compile src/ui/components/preprocessing_panel.py)"
+      "Bash(python -m py_compile src/ui/components/preprocessing_panel.py)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/ui/components/visualization_panel.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")"
     ]
   }
 }

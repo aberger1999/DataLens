@@ -742,6 +742,73 @@ def get_colors(theme: str = "dark") -> dict:
     return PALETTES.get(theme, DARK)
 
 
+def apply_chart_theme(fig, ax, theme: str = "dark", bg_override=None):
+    """Apply theme-aware styling to a matplotlib figure and axes.
+
+    Parameters
+    ----------
+    fig, ax
+        The matplotlib figure and axes to style.
+    theme
+        "dark" or "light".
+    bg_override
+        Optional color (hex string or matplotlib-accepted color) used for
+        both the figure patch and the axes face. When ``None`` the theme's
+        default chart background is used.
+    """
+    if theme == "light":
+        default_fig_bg = LIGHT["bg_secondary"]   # #ffffff
+        default_ax_bg = "#ffffff"
+        text_color = "#1a1b2e"
+        tick_color = "#374151"
+        title_color = "#0f172a"
+        spine_color = (0.0, 0.0, 0.0, 0.18)
+        legend_bg = "#ffffff"
+        legend_edge = (0.0, 0.0, 0.0, 0.15)
+    else:
+        default_fig_bg = DARK["bg_secondary"]    # #1a1f2e
+        default_ax_bg = DARK["bg_input"]         # #1e2433
+        text_color = "#cbd5e1"
+        tick_color = "#cbd5e1"
+        title_color = "#f1f5f9"
+        spine_color = (1.0, 1.0, 1.0, 0.15)
+        legend_bg = DARK["bg_input"]
+        legend_edge = (1.0, 1.0, 1.0, 0.15)
+
+    fig_bg = bg_override if bg_override else default_fig_bg
+    ax_bg = bg_override if bg_override else default_ax_bg
+
+    fig.patch.set_facecolor(fig_bg)
+    ax.set_facecolor(ax_bg)
+
+    ax.tick_params(colors=tick_color)
+    ax.xaxis.label.set_color(text_color)
+    ax.yaxis.label.set_color(text_color)
+    ax.title.set_color(title_color)
+
+    ax.spines['bottom'].set_color(spine_color)
+    ax.spines['left'].set_color(spine_color)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_color(tick_color)
+
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.get_frame().set_facecolor(legend_bg)
+        for text in legend.get_texts():
+            text.set_color(text_color)
+        legend.get_frame().set_edgecolor(legend_edge)
+
+    for cb_ax in fig.get_axes():
+        if cb_ax is not ax:
+            cb_ax.tick_params(colors=tick_color)
+            cb_ax.yaxis.label.set_color(text_color)
+            for label in cb_ax.get_yticklabels():
+                label.set_color(tick_color)
+
+
 def apply_dark_theme(fig, ax):
     """Apply dark theme styling to a matplotlib figure and axes.
 
