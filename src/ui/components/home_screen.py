@@ -202,6 +202,112 @@ class CreateWorkspaceCard(QFrame):
             self.clicked.emit()
         super().mousePressEvent(event)
 
+class NewProjectCard(QFrame):
+    """Ghost placeholder tile that triggers new workspace creation."""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, theme="dark"):
+        super().__init__()
+        self.current_theme = theme
+        self._hovered = False
+        self.init_ui()
+
+    def init_ui(self):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(140)
+        self.setMaximumHeight(160)
+        self.setMaximumWidth(320)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        layout.addStretch()
+
+        # "+" box
+        self.plus_box = QLabel("+")
+        self.plus_box.setFixedSize(36, 36)
+        self.plus_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        plus_row = QHBoxLayout()
+        plus_row.setContentsMargins(0, 0, 0, 0)
+        plus_row.addStretch()
+        plus_row.addWidget(self.plus_box)
+        plus_row.addStretch()
+        layout.addLayout(plus_row)
+
+        # Label
+        self.caption = QLabel("New Project")
+        self.caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.caption)
+
+        layout.addStretch()
+
+        self._apply_styles()
+
+    def _apply_styles(self):
+        dark = self.current_theme == "dark"
+
+        if self._hovered:
+            border_color = "#6366f1"
+            plus_border = "#6366f1"
+            plus_color = "#6366f1"
+            text_color = "#6366f1"
+        else:
+            border_color = "rgba(255,255,255,0.2)" if dark else "rgba(0,0,0,0.15)"
+            plus_border = "rgba(255,255,255,0.25)" if dark else "rgba(0,0,0,0.2)"
+            plus_color = "rgba(255,255,255,0.4)" if dark else "rgba(0,0,0,0.3)"
+            text_color = "rgba(255,255,255,0.4)" if dark else "rgba(0,0,0,0.35)"
+
+        self.setStyleSheet(f"""
+            NewProjectCard {{
+                background-color: transparent;
+                border: 2px dashed {border_color};
+                border-radius: 10px;
+            }}
+        """)
+
+        self.plus_box.setStyleSheet(f"""
+            QLabel {{
+                background-color: transparent;
+                border: 2px solid {plus_border};
+                border-radius: 8px;
+                color: {plus_color};
+                font-size: 22px;
+                font-weight: 500;
+            }}
+        """)
+
+        self.caption.setStyleSheet(f"""
+            QLabel {{
+                background-color: transparent;
+                border: none;
+                color: {text_color};
+                font-size: 12px;
+                font-weight: 500;
+            }}
+        """)
+
+    def update_theme(self):
+        self._apply_styles()
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self._apply_styles()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self._apply_styles()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+
 class CreateWorkspaceDialog(QDialog):
     """Dialog for creating a new workspace."""
 
@@ -667,14 +773,16 @@ class HomeScreen(QWidget):
             title_row.addWidget(logo_label)
 
         self.title_label = QLabel("DataLens")
-        self.title_label.setStyleSheet("""
-            QLabel {
+        _title_color = "#ffffff" if self.current_theme == "dark" else "#0f172a"
+        self.title_label.setStyleSheet(f"""
+            QLabel {{
+                color: {_title_color};
                 font-size: 32px;
                 font-weight: 700;
                 letter-spacing: -0.5px;
                 background: transparent;
                 border: none;
-            }
+            }}
         """)
         title_row.addWidget(self.title_label)
         title_row.addStretch()
@@ -699,25 +807,6 @@ class HomeScreen(QWidget):
         self.separator.setFrameShape(QFrame.Shape.HLine)
         self.separator.setFixedHeight(1)
         layout.addWidget(self.separator)
-
-        # Workspaces section header
-        workspaces_header_layout = QHBoxLayout()
-
-        workspaces_label = QLabel("Your Workspaces")
-        workspaces_font = QFont()
-        workspaces_font.setPointSize(13)
-        workspaces_font.setBold(True)
-        workspaces_label.setFont(workspaces_font)
-        workspaces_header_layout.addWidget(workspaces_label)
-
-        workspaces_header_layout.addStretch()
-
-        self.create_workspace_btn = QPushButton("+ New Workspace")
-        self.create_workspace_btn.setProperty("cssClass", "primary")
-        self.create_workspace_btn.clicked.connect(self.create_new_workspace)
-        workspaces_header_layout.addWidget(self.create_workspace_btn)
-
-        layout.addLayout(workspaces_header_layout)
 
         # Scrollable workspace grid
         scroll_area = QScrollArea()
@@ -795,12 +884,6 @@ class HomeScreen(QWidget):
         # Theme toggle restyles itself for the active theme
         self.theme_toggle.set_theme(self.current_theme)
 
-        # New workspace uses the global primary style
-        self.create_workspace_btn.setProperty("cssClass", "primary")
-        self.create_workspace_btn.setStyleSheet("")
-        self.create_workspace_btn.style().unpolish(self.create_workspace_btn)
-        self.create_workspace_btn.style().polish(self.create_workspace_btn)
-
     def load_workspaces(self):
         """Load and display all workspaces."""
         for i in reversed(range(self.workspaces_layout.count())):
@@ -854,12 +937,10 @@ class HomeScreen(QWidget):
                     col = 0
                     row += 1
 
-        if len(self.workspaces) == 0:
-            c = get_colors(self.current_theme)
-            empty_label = QLabel("No workspaces yet. Click '+ New Workspace' to get started!")
-            empty_label.setStyleSheet(f"color: {c['text_secondary']}; font-size: 11pt; padding: 40px;")
-            empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.workspaces_layout.addWidget(empty_label, 0, 0, 1, 3)
+        # Ghost "New Project" tile always appears as the last item
+        ghost_tile = NewProjectCard(self.current_theme)
+        ghost_tile.clicked.connect(self.create_new_workspace)
+        self.workspaces_layout.addWidget(ghost_tile, row, col)
 
     def on_workspace_clicked(self, workspace_id):
         """Handle workspace selection."""
