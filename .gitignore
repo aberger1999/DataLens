@@ -60,9 +60,9 @@ cover/
 .python-version
 
 # PyInstaller
-#  Usually these are temporary/generated, but data_analysis_app.spec is customized and tracked
+#  Usually these are temporary/generated, but DataLens.spec is customized and tracked
 *.manifest
-# data_analysis_app.spec # Keeping this as it is customized source
+# DataLens.spec # Keeping this as it is customized source
 # dist/ and build/ are already covered above
 
 # Distribution / Installers

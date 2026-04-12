@@ -11,6 +11,7 @@ from . import modal
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon
 import os
+import sys
 import json
 import shutil
 from datetime import datetime
@@ -113,12 +114,21 @@ class WorkspaceManagerPanel(QWidget):
         super().__init__()
         self.data_manager = data_manager
         self.active_workspace = None
-        self.workspaces_dir = "workspaces"
+        self.workspaces_dir = self._get_workspaces_dir()
         self.max_workspaces = 5
         self.init_workspace_structure()
         self.init_ui()
         self.load_workspaces()
         
+    @staticmethod
+    def _get_workspaces_dir():
+        """Return a user-writable workspaces directory."""
+        if getattr(sys, 'frozen', False):
+            base = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'DataLens')
+        else:
+            base = '.'
+        return os.path.join(base, 'workspaces')
+
     def init_workspace_structure(self):
         """Initialize workspace directory structure."""
         if not os.path.exists(self.workspaces_dir):

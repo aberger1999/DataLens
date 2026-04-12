@@ -6,7 +6,7 @@
 
 1. **Build the application:**
    ```bash
-   pyinstaller data_analysis_app.spec --clean --noconfirm
+   pyinstaller DataLens.spec --clean --noconfirm
    ```
 
 2. **Create the installer:**

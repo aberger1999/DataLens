@@ -75,7 +75,7 @@ pip install -r requirements.txt
 
 2. Build the executable with PyInstaller:
 ```bash
-pyinstaller data_analysis_app.spec --clean --noconfirm
+pyinstaller DataLens.spec --clean --noconfirm
 ```
 
 3. Create the Windows installer:
@@ -117,7 +117,7 @@ Data-Analysis-Application/
 ├── templates/
 │   └── report_template.html             # HTML report template
 ├── requirements.txt                     # Python dependencies
-├── data_analysis_app.spec               # PyInstaller configuration
+├── DataLens.spec               # PyInstaller configuration
 ├── version_info.txt                     # Windows version metadata
 ├── installer.iss                        # Inno Setup installer script
 ├── qt_runtime_hook.py                   # Qt runtime path configuration

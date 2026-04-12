@@ -13,6 +13,7 @@ from PyQt5.QtGui import QFont
 from ..theme import get_colors, current_theme, RADIUS_LG, RADIUS_MD, RADIUS_SM
 from . import modal
 import os
+import sys
 import json
 from datetime import datetime
 
@@ -691,12 +692,26 @@ class HomeScreen(QWidget):
 
     def __init__(self, initial_theme="light"):
         super().__init__()
-        self.workspaces_dir = "workspaces"
+        self.workspaces_dir = self._get_workspaces_dir()
         self.workspaces = []
         self.current_theme = initial_theme
         self.init_workspace_structure()
         self.init_ui()
         self.load_workspaces()
+
+    @staticmethod
+    def _get_workspaces_dir():
+        """Return a user-writable workspaces directory.
+
+        When running from a frozen (installed) build, use AppData so the app
+        does not need write access to Program Files.  When running from source,
+        keep using the local 'workspaces' folder for convenience.
+        """
+        if getattr(sys, 'frozen', False):
+            base = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'DataLens')
+        else:
+            base = '.'
+        return os.path.join(base, 'workspaces')
 
     def init_workspace_structure(self):
         """Initialize workspace directory structure."""
