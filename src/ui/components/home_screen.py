@@ -703,10 +703,6 @@ class HomeScreen(QWidget):
         if not os.path.exists(self.workspaces_dir):
             os.makedirs(self.workspaces_dir)
 
-        workspace_1_path = os.path.join(self.workspaces_dir, "workspace_1")
-        if not os.path.exists(workspace_1_path):
-            self.create_workspace_structure(1, "My Workspace")
-
     def create_workspace_structure(self, workspace_id, name):
         """Create a new workspace structure."""
         workspace_path = os.path.join(self.workspaces_dir, f"workspace_{workspace_id}")
