@@ -1,82 +1,40 @@
-# Quick Start: Creating Windows Installer
+# Building the DataLens Windows Installer
 
-## ⭐ RECOMMENDED METHOD (Works Best with PyQt6)
+## Quick Start
 
 ### Using PyInstaller + Inno Setup
 
 1. **Build the application:**
-   ```powershell
-   .\build_installer.ps1
-   ```
-
-2. **If you don't have Inno Setup:**
-   - Download from: https://jrsoftware.org/isdl.php
-   - Install it
-   - Run the script again
-
-3. **Done!** Your installer will be at `installer/DataAnalysisApp-Setup-1.0.0.exe`
-
----
-
-## Alternative: MSI Installer (More Complex)
-
-### Method 1: cx_Freeze (Simple but has PyQt6 issues)
-
-⚠️ **Note:** cx_Freeze has compatibility issues with PyQt6. Use the Inno Setup method above instead.
-
-```bash
-pip install cx_Freeze
-.\build_msi_simple.ps1
-```
-
-### Method 2: WiX Toolset (Professional MSI)
-
-1. Download WiX Toolset from https://wixtoolset.org/
-2. Run:
    ```bash
-   .\build_msi.bat
+   pyinstaller data_analysis_app.spec --clean --noconfirm
    ```
 
----
+2. **Create the installer:**
+   ```bash
+   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+   ```
 
-## What You Get
+3. **Done!** The installer will be at `installer_output/DataLens_1.0_Setup.exe`
 
-✅ Professional Windows installer (.exe or .msi file)
-✅ Start Menu shortcuts
-✅ Desktop shortcuts
-✅ Add/Remove Programs integration
-✅ Clean uninstallation
-✅ Silent install support
+### Prerequisites
 
----
+- Python 3.8+
+- [Inno Setup 6](https://jrsoftware.org/isdl.php)
 
-## Which Method Should I Use?
+## What the Installer Includes
 
-| Method | Best For | Pros | Cons |
-|--------|----------|------|------|
-| **PyInstaller + Inno Setup** | **Most users** | Easy, works great with PyQt6, small installer | Requires Inno Setup |
-| **WiX Toolset** | Enterprise/Corporate | True MSI, Group Policy support | Complex setup |
-| **cx_Freeze** | Quick testing | Python-native | PyQt6 compatibility issues |
+- DataLens application (DataLens.exe)
+- All required dependencies bundled
+- Start Menu shortcuts
+- Optional desktop shortcut
+- Uninstaller (via Add/Remove Programs)
 
----
+## Updating the Version
 
-## Updating Your App
-
-1. Make your code changes
-2. Update version in `installer/inno_setup.iss` (line 5)
-3. Run `.\build_installer.ps1`
-4. Distribute the new installer
-
----
-
-## Full Documentation
-
-See `MSI_INSTALLER_GUIDE.md` for complete instructions and troubleshooting.
-
----
+1. Update version in `installer.iss` (AppVersion line)
+2. Update version in `version_info.txt` (filevers and prodvers)
+3. Rebuild with PyInstaller and Inno Setup
 
 ## Distribution
 
-Share the installer file with users. They can:
-- Double-click to install
-- Installer handles everything automatically
+Share `DataLens_1.0_Setup.exe` with users. They double-click to install and the setup wizard handles the rest.

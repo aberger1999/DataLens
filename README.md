@@ -1,53 +1,38 @@
-# Data Analysis Application
+# DataLens
 
-A modern, cross-platform desktop application for data analysis built with PyQt6. Features a dark theme UI and comprehensive data analysis tools including visualization, statistical analysis, and machine learning capabilities.
+A modern desktop data analysis application built with PyQt5. Features a workspace-based project system, dark and light themes, and comprehensive data analysis tools including visualization, statistical analysis, machine learning, and report generation.
 
 ## Features
 
+- **Workspace Management**: Create and manage multiple project workspaces from a home screen
 - **Data Import/Export**: Support for CSV, Excel, and other common data formats
+- **Dataset Manager**: Import, load, rename, and delete datasets within a workspace
+- **Data Preprocessing**: Clean and transform data with built-in tools
+- **Feature Engineering**: Create new features, encode categoricals, and extract datetime components
 - **Data Visualization**: Interactive charts and plots using Matplotlib and Seaborn
 - **Statistical Analysis**: Comprehensive statistical tools powered by SciPy
 - **Machine Learning**: Built-in ML capabilities using scikit-learn
-- **Modern UI**: Dark theme with intuitive interface
-- **Cross-Platform**: Runs on both Windows and macOS
+- **Report Generation**: Generate PDF and HTML reports from your analysis
+- **Dark & Light Themes**: Modern UI with theme switching support
+- **Unsaved Changes Protection**: Confirmation dialogs prevent accidental data loss
 
 ## System Requirements
 
 - **Windows**: Windows 10 or later
-- **macOS**: macOS 10.14 (Mojave) or later
-- **Python**: 3.8 or later (for development only)
 
 ## Installation
 
 ### For End Users
 
-#### Windows (Recommended - Installer)
-
-**Option 1: Using the Installer (Easiest)**
-1. Download `DataAnalysisApp-Setup-1.0.0.exe` from the [releases page](../../releases)
+1. Download `DataLens_1.0_Setup.exe` from the [releases page](../../releases)
 2. Double-click the installer and follow the setup wizard
 3. Launch the app from:
-   - Start Menu → Data Analysis Application
+   - Start Menu > DataLens
    - Desktop shortcut (if selected during installation)
 
-**Option 2: Portable Version**
-1. Download `DataAnalysisApp-Portable-Windows.zip` from the [releases page](../../releases)
-2. Extract the ZIP file to any location
-3. Run `data_analysis_app.exe` from the extracted folder
-
 **Uninstalling**
-- Go to Settings → Apps → Apps & features
-- Find "Data Analysis Application" and click Uninstall
-
-#### macOS
-1. Download the latest release from the [releases page](../../releases)
-2. Open the DMG file
-3. Drag `DataAnalysisApp.app` to your Applications folder
-4. Run the application from Applications
-
-**First Launch on macOS**
-- Right-click the app and select "Open" the first time
-- If you see "App is damaged", run: `xattr -cr /Applications/DataAnalysisApp.app`
+- Go to Settings > Apps > Apps & features
+- Find "DataLens" and click Uninstall
 
 ### For Developers
 
@@ -57,15 +42,12 @@ git clone <repository-url>
 cd Data-Analysis-Application
 ```
 
-2. Create a virtual environment (recommended):
+2. Create a virtual environment:
 ```bash
 python -m venv venv
 
 # On Windows:
 venv\Scripts\activate
-
-# On macOS/Linux:
-source venv/bin/activate
 ```
 
 3. Install dependencies:
@@ -80,190 +62,112 @@ python src/main.py
 
 ## Building from Source
 
-### Windows Installer
-
-**Prerequisites:**
+### Prerequisites
 - Python 3.8 or later
-- [Inno Setup](https://jrsoftware.org/isdl.php) (for creating installer)
+- [Inno Setup 6](https://jrsoftware.org/isdl.php) (for creating the installer)
 
-**Build Steps:**
+### Build Steps
 
 1. Install dependencies:
-```powershell
+```bash
 pip install -r requirements.txt
 ```
 
-2. Run the build script:
-```powershell
-.\build_installer.ps1
-```
-
-Or using Command Prompt:
-```cmd
-build_installer.bat
-```
-
-3. The installer will be created in `installer/DataAnalysisApp-Setup-1.0.0.exe`
-
-**What the build script does:**
-- Bundles the application with PyInstaller
-- Fixes Qt DLL paths automatically
-- Creates a professional Windows installer with Inno Setup
-
-**Alternative Build Methods:**
-- See `INSTALLER_SOLUTION.md` for the complete guide
-- See `MSI_INSTALLER_GUIDE.md` for WiX Toolset MSI creation
-
-### Windows Portable (No Installer)
-
+2. Build the executable with PyInstaller:
 ```bash
-# Build with PyInstaller
-pyinstaller data_analysis_app.spec --noconfirm
-
-# Fix Qt DLLs
-Copy-Item "dist\data_analysis_app\_internal\Qt6*.dll" "dist\data_analysis_app\" -Force
-
-# The portable app is now in dist/data_analysis_app/
+pyinstaller data_analysis_app.spec --clean --noconfirm
 ```
 
-### macOS
-
-1. Install dependencies:
+3. Create the Windows installer:
 ```bash
-pip3 install -r requirements.txt
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ```
 
-2. Make the build script executable and run it:
-```bash
-chmod +x build_mac.sh
-./build_mac.sh
-```
+4. The installer will be created at `installer_output/DataLens_1.0_Setup.exe`
 
-3. The application bundle will be created in `dist/DataAnalysisApp.app`
+### Portable Version (No Installer)
 
-4. (Optional) Create a DMG installer:
-```bash
-hdiutil create -volname DataAnalysisApp -srcfolder dist/DataAnalysisApp.app -ov -format UDZO dist/DataAnalysisApp.dmg
-```
+After running the PyInstaller step above, the portable app is available in `dist/DataLens/`. Run `DataLens.exe` directly from that folder.
 
 ## Project Structure
 
 ```
 Data-Analysis-Application/
 ├── src/
-│   ├── main.py              # Application entry point
-│   └── ui/                  # UI components
-│       ├── main_window.py   # Main application window
-│       └── components/      # Reusable UI components
-├── installer/               # Installer configuration files
-│   ├── inno_setup.iss      # Inno Setup script
-│   ├── wix_config.wxs      # WiX Toolset configuration
-│   └── README.md           # Installer quick reference
-├── assets/                  # Application icons and resources
-├── requirements.txt         # Python dependencies
-├── data_analysis_app.spec   # PyInstaller configuration
-├── build_installer.ps1      # Windows installer build script
-├── build_installer.bat      # Windows installer build script (CMD)
-├── build_mac.sh            # macOS build script
-├── INSTALLER_SOLUTION.md   # Complete installer guide
-└── README.md               # This file
+│   ├── main.py                          # Application entry point
+│   └── ui/
+│       ├── main_window.py               # Main application window
+│       ├── theme.py                     # Centralized theme system
+│       ├── data_manager.py              # Data loading and management
+│       ├── dwm_helper.py               # Windows DWM integration
+│       └── components/
+│           ├── home_screen.py           # Home screen and workspace tiles
+│           ├── workspace_view.py        # Workspace layout and data view
+│           ├── dataset_manager_panel.py # Dataset management dialog
+│           ├── preprocessing_panel.py   # Data preprocessing tools
+│           ├── feature_engineering_panel.py # Feature engineering tools
+│           ├── visualization_panel.py   # Chart and plot creation
+│           ├── analysis_panel.py        # Statistical analysis
+│           ├── machine_learning_panel.py # ML model training
+│           ├── report_generator_panel.py # Report generation
+│           ├── data_preview.py          # Data table preview
+│           ├── modal.py                 # Reusable modal dialogs
+│           └── workspace_manager_panel.py # Workspace management
+├── assets/                              # Application icons and logos
+├── templates/
+│   └── report_template.html             # HTML report template
+├── requirements.txt                     # Python dependencies
+├── data_analysis_app.spec               # PyInstaller configuration
+├── version_info.txt                     # Windows version metadata
+├── installer.iss                        # Inno Setup installer script
+├── qt_runtime_hook.py                   # Qt runtime path configuration
+└── README.md                            # This file
 ```
-
-## Development
-
-### Code Style
-- Follow PEP 8 guidelines
-- Use type hints where appropriate
-- Document functions and classes with docstrings
-
-### Adding New Features
-1. Create a new branch for your feature
-2. Implement the feature in the appropriate module
-3. Test thoroughly on both Windows and macOS if possible
-4. Submit a pull request
-
-### Building Installers for Distribution
-
-**For Windows:**
-1. Update version in `installer/inno_setup.iss` (line 5)
-2. Run `.\build_installer.ps1`
-3. Test the installer on a clean Windows machine
-4. Upload to releases
-
-**For macOS:**
-1. Run `./build_mac.sh`
-2. Create DMG with `hdiutil create`
-3. Test on a clean macOS machine
-4. Upload to releases
 
 ## Dependencies
 
-- **PyQt6**: Modern Qt6 bindings for Python
+- **PyQt5**: Qt5 bindings for Python (UI framework)
 - **pandas**: Data manipulation and analysis
 - **numpy**: Numerical computing
 - **matplotlib**: Data visualization
 - **seaborn**: Statistical data visualization
 - **scipy**: Scientific computing
 - **scikit-learn**: Machine learning
-- **openpyxl**: Excel file support
+- **openpyxl**: Excel file read/write support
+- **xlrd**: Legacy Excel file support
+- **jinja2**: HTML report templating
+- **pillow**: Image processing (icon generation)
 - **PyInstaller**: Application packaging
 
 ## Troubleshooting
 
-### Windows
-
-**Issue**: Application doesn't start
+**Application doesn't start**
 - Make sure you have the Visual C++ Redistributable installed
 - Try running as administrator
-- If using portable version, ensure all files are extracted
 
-**Issue**: "DLL load failed" error
-- This is fixed in the latest build
-- If building from source, make sure to run the build script (not just PyInstaller)
-
-**Issue**: High DPI scaling issues
-- The application should automatically handle high DPI displays
-- If issues persist, try adjusting Windows display scaling settings
-
-**Issue**: Installer won't run
+**Installer won't run**
 - Right-click the installer and select "Run as administrator"
-- Check Windows SmartScreen settings
+- If Windows SmartScreen blocks it, click "More info" then "Run anyway"
 
-### macOS
-
-**Issue**: "App is damaged and can't be opened"
-- This is a Gatekeeper issue. Run: `xattr -cr /path/to/DataAnalysisApp.app`
-
-**Issue**: Application won't open
-- Right-click the app and select "Open" the first time
-- Check System Preferences > Security & Privacy
-
-## Documentation
-
-- **`INSTALLER_SOLUTION.md`** - Complete guide to the Windows installer setup
-- **`MSI_INSTALLER_GUIDE.md`** - Alternative MSI creation methods (WiX, cx_Freeze)
-- **`DISTRIBUTION.md`** - Distribution and packaging guidelines
-- **`DEVELOPMENT.md`** - Development setup and guidelines
-- **`installer/README.md`** - Quick reference for building installers
+**High DPI scaling issues**
+- The application handles high DPI displays automatically
+- If issues persist, try adjusting Windows display scaling settings
 
 ## License
 
 Licensed under the Open Software License version 3.0
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Support
-
-For issues and questions, please open an issue on the GitHub repository.
-
 ## Version History
 
-### Version 1.0.0
-- Initial release
-- Cross-platform support for Windows and macOS
-- Modern dark theme UI
-- Core data analysis features
-- Professional Windows installer with Inno Setup
-- Portable Windows version available
+### Version 1.0
+- Workspace-based project management with home screen
+- Dark and light theme support
+- Data import/export (CSV, Excel)
+- Dataset manager with import, rename, and delete
+- Data preprocessing and feature engineering
+- Interactive data visualization
+- Statistical analysis tools
+- Machine learning model training
+- PDF and HTML report generation
+- Unsaved changes tracking with save confirmation dialogs
+- Professional Windows installer
