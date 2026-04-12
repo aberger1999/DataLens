@@ -489,6 +489,543 @@ class ConfigureLayoutDialog(QDialog):
         super().mouseReleaseEvent(event)
 
 
+class ThemedFigureOptionsDialog(QDialog):
+    """Themed replacement for matplotlib's Figure options (``fedit``) dialog.
+
+    Wraps matplotlib's own ``FormWidget`` / ``FormTabWidget`` /
+    ``FormComboWidget`` inside the same rounded/frameless chrome used by
+    :class:`ConfigureLayoutDialog`, and provides the minimal
+    ``FormDialog``-compatible API (``register_float_field``,
+    ``update_buttons``) that those widgets expect from their parent
+    dialog.
+    """
+
+    def __init__(self, data, title="", comment="",
+                 icon=None, parent=None, apply=None):
+        super().__init__(parent)
+        self.apply_callback = apply
+        self.data = None
+        self._drag_pos = None
+
+        # Snapshot theme at build time
+        self._theme = current_theme()
+        self._c = get_colors(self._theme)
+        self._is_dark = self._theme == "dark"
+
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setModal(True)
+        self.setMinimumWidth(600)
+
+        # Build matplotlib's own form widget internally so we reuse its
+        # data gathering and .get() logic.
+        from matplotlib.backends.qt_editor._formlayout import (
+            FormWidget, FormComboWidget, FormTabWidget
+        )
+
+        if isinstance(data[0][0], (list, tuple)):
+            self.formwidget = FormTabWidget(
+                data, comment=comment, parent=self
+            )
+        elif len(data[0]) == 3:
+            self.formwidget = FormComboWidget(
+                data, comment=comment, parent=self
+            )
+        else:
+            self.formwidget = FormWidget(
+                data, comment=comment, parent=self
+            )
+
+        self.float_fields = []
+        self.formwidget.setup()
+        self.formwidget.update_buttons.connect(self.update_buttons)
+
+        self._build_chrome(title or "Figure Options")
+
+    # ── FormDialog-compatible API ───────────────────────────────────────
+
+    def register_float_field(self, field):
+        self.float_fields.append(field)
+
+    def update_buttons(self):
+        from matplotlib.backends.qt_editor._formlayout import is_edit_valid
+        valid = True
+        for field in self.float_fields:
+            if not is_edit_valid(field):
+                valid = False
+        if hasattr(self, 'ok_btn'):
+            self.ok_btn.setEnabled(valid)
+        if hasattr(self, 'apply_btn'):
+            self.apply_btn.setEnabled(valid)
+
+    def get(self):
+        return self.data
+
+    # ── UI construction ─────────────────────────────────────────────────
+
+    def _build_chrome(self, title):
+        c = self._c
+        body_bg = c['bg_primary']
+        title_bar_bg = c['bg_base']
+        title_text = c['text_inverse'] if self._is_dark else c['text_primary']
+        close_icon_color = c['text_secondary']
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self._frame = QFrame()
+        self._frame.setObjectName("figureOptionsFrame")
+        self._frame.setStyleSheet(f"""
+            QFrame#figureOptionsFrame {{
+                background: {body_bg};
+                border: 1px solid {c['border']};
+                border-radius: 10px;
+            }}
+        """)
+        outer.addWidget(self._frame)
+
+        body = QVBoxLayout(self._frame)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+
+        # ── Title bar ──────────────────────────────────────────────────
+        self._title_bar = QWidget()
+        self._title_bar.setFixedHeight(36)
+        self._title_bar.setStyleSheet(f"""
+            QWidget {{
+                background: {title_bar_bg};
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border: none;
+            }}
+        """)
+        title_lay = QHBoxLayout(self._title_bar)
+        title_lay.setContentsMargins(14, 0, 6, 0)
+        title_lay.setSpacing(6)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(
+            f"color: {title_text}; font-size: 13px; font-weight: 500; "
+            "background: transparent; border: none;"
+        )
+        title_lay.addWidget(title_label)
+        title_lay.addStretch()
+
+        close_btn = QPushButton("\u2715")
+        close_btn.setFixedSize(28, 28)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {close_icon_color};
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                padding: 0px;
+                min-height: 0px;
+            }}
+            QPushButton:hover {{
+                background: {c['danger']};
+                color: #ffffff;
+            }}
+        """)
+        close_btn.clicked.connect(self.reject)
+        title_lay.addWidget(close_btn)
+        body.addWidget(self._title_bar)
+
+        # ── Content area ───────────────────────────────────────────────
+        # Apply the content stylesheet at the *frame* level so it
+        # cascades through the scroll-area viewport to the formwidget
+        # children (QLabel, QLineEdit, QComboBox, etc.).
+        self._frame.setStyleSheet(
+            self._frame.styleSheet() + self._content_stylesheet()
+        )
+
+        content = QWidget()
+        content.setObjectName("figureOptionsContent")
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(20, 16, 20, 16)
+        content_lay.setSpacing(14)
+
+        # Wrap the form widget in a scroll area — Curves tab can grow tall.
+        scroll = QScrollArea()
+        scroll.setWidget(self.formwidget)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        scroll.setMinimumHeight(300)
+        scroll.setMaximumHeight(560)
+        content_lay.addWidget(scroll, 1)
+
+        # Button row
+        button_row = QHBoxLayout()
+        button_row.setSpacing(8)
+        button_row.addStretch()
+
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_btn.setFixedHeight(34)
+        self.cancel_btn.setMinimumWidth(90)
+        self.cancel_btn.setStyleSheet(self._outlined_button_style())
+        self.cancel_btn.clicked.connect(self.reject)
+        button_row.addWidget(self.cancel_btn)
+
+        if self.apply_callback is not None:
+            self.apply_btn = QPushButton("Apply")
+            self.apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.apply_btn.setFixedHeight(34)
+            self.apply_btn.setMinimumWidth(90)
+            self.apply_btn.setStyleSheet(self._outlined_button_style())
+            self.apply_btn.clicked.connect(self._on_apply)
+            button_row.addWidget(self.apply_btn)
+
+        self.ok_btn = QPushButton("OK")
+        self.ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ok_btn.setFixedHeight(34)
+        self.ok_btn.setMinimumWidth(90)
+        self.ok_btn.setStyleSheet(self._primary_button_style())
+        self.ok_btn.setDefault(True)
+        self.ok_btn.clicked.connect(self.accept)
+        button_row.addWidget(self.ok_btn)
+
+        content_lay.addLayout(button_row)
+        body.addWidget(content, 1)
+
+    def _content_stylesheet(self):
+        c = self._c
+        # Stronger borders for visible contrast against the background
+        if self._is_dark:
+            input_border = "rgba(255,255,255,0.22)"
+            input_bg = "#232a3b"          # notably lighter than bg_primary
+            hover_bg = "rgba(255,255,255,0.08)"
+            dropdown_bg = "#2a3245"
+        else:
+            input_border = "rgba(0,0,0,0.22)"
+            input_bg = "#ffffff"
+            hover_bg = "rgba(0,0,0,0.05)"
+            dropdown_bg = "#ffffff"
+        tab_unselected_text = c['text_secondary']
+        tab_selected_bg = input_bg
+
+        return f"""
+            QLabel {{
+                color: {c['text_primary']};
+                background: transparent;
+                border: none;
+                font-size: 12px;
+                min-height: 18px;
+            }}
+            QLineEdit {{
+                background: {input_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 28px;
+                font-size: 12px;
+                selection-background-color: {c['accent']};
+                selection-color: #ffffff;
+            }}
+            QLineEdit:focus {{
+                border-color: {c['accent']};
+            }}
+            QSpinBox, QDoubleSpinBox {{
+                background: {input_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 28px;
+                font-size: 12px;
+                selection-background-color: {c['accent']};
+                selection-color: #ffffff;
+            }}
+            QSpinBox:focus, QDoubleSpinBox:focus {{
+                border-color: {c['accent']};
+            }}
+            QSpinBox::up-button, QSpinBox::down-button,
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                width: 16px;
+                border: none;
+            }}
+            QComboBox, QFontComboBox {{
+                background: {input_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                padding: 6px 10px;
+                padding-right: 28px;
+                min-height: 28px;
+                font-size: 12px;
+                selection-background-color: {c['accent']};
+                selection-color: #ffffff;
+            }}
+            QComboBox:focus, QFontComboBox:focus {{
+                border-color: {c['accent']};
+            }}
+            QComboBox::drop-down, QFontComboBox::drop-down {{
+                border: none;
+                width: 26px;
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+            }}
+            QComboBox::down-arrow, QFontComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid {c['text_secondary']};
+                width: 0px;
+                height: 0px;
+            }}
+            QComboBox QAbstractItemView,
+            QFontComboBox QAbstractItemView {{
+                background: {dropdown_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                selection-background-color: {c['accent']};
+                selection-color: #ffffff;
+                padding: 4px;
+                outline: none;
+            }}
+            QDateEdit, QDateTimeEdit {{
+                background: {input_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 28px;
+                font-size: 12px;
+            }}
+            QDateEdit:focus, QDateTimeEdit:focus {{
+                border-color: {c['accent']};
+            }}
+            QCheckBox {{
+                color: {c['text_primary']};
+                background: transparent;
+                spacing: 8px;
+                font-size: 12px;
+                min-height: 24px;
+            }}
+            QCheckBox::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border: 1px solid {input_border};
+                background: {input_bg};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {c['accent']};
+                border: 1px solid {c['accent']};
+                image: none;
+            }}
+            QTabWidget::pane {{
+                border: 1px solid {input_border};
+                border-radius: 6px;
+                background: {c['bg_primary']};
+                top: -1px;
+                padding: 8px;
+            }}
+            QTabBar {{
+                background: transparent;
+            }}
+            QTabBar::tab {{
+                background: transparent;
+                color: {tab_unselected_text};
+                padding: 8px 16px;
+                border: 1px solid transparent;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+                min-height: 20px;
+            }}
+            QTabBar::tab:selected {{
+                background: {tab_selected_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-bottom-color: {tab_selected_bg};
+            }}
+            QTabBar::tab:hover:!selected {{
+                color: {c['text_primary']};
+                background: {hover_bg};
+            }}
+            /* Color buttons (matplotlib's 20x20 ColorButton) */
+            QPushButton {{
+                background: {input_bg};
+                color: {c['text_primary']};
+                border: 1px solid {input_border};
+                border-radius: 4px;
+                padding: 4px 8px;
+                min-width: 18px;
+            }}
+            QPushButton:hover {{
+                background: {hover_bg};
+                border-color: {c['accent']};
+            }}
+            QFormLayout {{
+                margin: 0px;
+            }}
+            QScrollArea {{
+                background: transparent;
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 10px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {input_border};
+                border-radius: 5px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {c['text_secondary']};
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+                background: transparent;
+            }}
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
+        """
+
+    def _outlined_button_style(self):
+        c = self._c
+        btn_border = ("rgba(255,255,255,0.20)" if self._is_dark
+                      else "rgba(0,0,0,0.18)")
+        hover_bg = ("rgba(255,255,255,0.06)" if self._is_dark
+                    else "rgba(0,0,0,0.05)")
+        return f"""
+            QPushButton {{
+                background: transparent;
+                color: {c['text_primary']};
+                border: 1px solid {btn_border};
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 500;
+                min-height: 0px;
+            }}
+            QPushButton:hover {{
+                background: {hover_bg};
+            }}
+        """
+
+    def _primary_button_style(self):
+        c = self._c
+        return f"""
+            QPushButton {{
+                background: {c['accent']};
+                color: {c['text_inverse']};
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 600;
+                min-height: 0px;
+            }}
+            QPushButton:hover {{
+                background: {c['accent_hover']};
+            }}
+        """
+
+    # ── Actions ─────────────────────────────────────────────────────────
+
+    def _on_apply(self):
+        try:
+            self.apply_callback(self.formwidget.get())
+        except Exception:
+            pass
+
+    def accept(self):
+        try:
+            self.data = self.formwidget.get()
+            if self.apply_callback is not None:
+                self.apply_callback(self.data)
+        except Exception:
+            pass
+        super().accept()
+
+    def reject(self):
+        self.data = None
+        super().reject()
+
+    # ── Drag support ────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._title_bar.underMouse()):
+            self._drag_pos = (
+                event.globalPos() - self.frameGeometry().topLeft()
+            )
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (self._drag_pos is not None
+                and event.buttons() & Qt.MouseButton.LeftButton):
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
+
+
+def _themed_fedit(data, title="", comment="", icon=None, parent=None, apply=None):
+    """Replacement for ``matplotlib._formlayout.fedit`` using our themed dialog.
+
+    Mirrors the original's non-modal ``show()`` behavior and the
+    ``parent._fedit_dialog`` attribute used to avoid stacking duplicate
+    dialogs.
+    """
+    dialog = ThemedFigureOptionsDialog(
+        data, title=title, comment=comment,
+        icon=icon, parent=parent, apply=apply
+    )
+    if parent is not None:
+        existing = getattr(parent, "_fedit_dialog", None)
+        if existing is not None:
+            try:
+                existing.close()
+            except Exception:
+                pass
+        parent._fedit_dialog = dialog
+    dialog.show()
+
+
+def _install_themed_figure_options():
+    """Monkey-patch matplotlib's ``_formlayout.fedit`` once per process.
+
+    matplotlib's ``figureoptions.figure_edit`` calls
+    ``_formlayout.fedit(...)`` to display the Customize dialog. We
+    substitute our themed wrapper so it picks up the app's light/dark
+    chrome, matching :class:`ConfigureLayoutDialog`.
+    """
+    try:
+        from matplotlib.backends.qt_editor import _formlayout
+        if getattr(_formlayout, '_datalens_themed', False):
+            return
+        _formlayout.fedit = _themed_fedit
+        _formlayout._datalens_themed = True
+    except Exception:
+        pass
+
+
+_install_themed_figure_options()
+
+
 class VisualizationPanel(QWidget):
     """Panel for creating and customizing visualizations."""
 
