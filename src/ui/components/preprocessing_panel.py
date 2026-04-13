@@ -26,6 +26,8 @@ class PreprocessingPanel(QWidget):
     preprocessing_complete = pyqtSignal()
     # Signal to notify when data has been modified
     data_modified = pyqtSignal()
+    # Signal requesting promotion of edits to the Main View
+    apply_requested = pyqtSignal()
 
     def __init__(self, data_manager):
         """Initialize the preprocessing panel."""
@@ -38,6 +40,18 @@ class PreprocessingPanel(QWidget):
         self.data_loaded_flag = False  # Flag to track whether data has been loaded
         self.init_ui()
         self.setup_connections()
+    
+    def _commit_edit(self, df):
+        """Commit an edit to the Editing View data manager.
+
+        This updates the editing dataset (right side) and emits signals so the
+        rest of the Editing View can refresh lazily. Nothing is saved to disk
+        until the Main View is explicitly saved.
+        """
+        self.data_manager._data = df
+        self.update_data_view()
+        self.data_manager.data_loaded.emit(df)
+        self.data_modified.emit()
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -188,10 +202,18 @@ class PreprocessingPanel(QWidget):
         # Set a fixed width for the delimiter input
         self.split_column.setFixedWidth(120)
         
-        self.split_delimiter = QLineEdit()
-        self.split_delimiter.setPlaceholderText("Delimiter")
-        self.split_delimiter.setText(",")
+        # Delimiter dropdown: common options + Custom… prompt.
+        self.split_delimiter = QComboBox()
         self.split_delimiter.setEnabled(False)  # Disable initially until data is loaded
+        self.split_delimiter.setFixedWidth(130)
+        self._custom_split_delimiter = None
+        self.split_delimiter.addItem("Comma (,)", ",")
+        self.split_delimiter.addItem("Tab (\\t)", "\t")
+        self.split_delimiter.addItem("Semicolon (;)", ";")
+        self.split_delimiter.addItem("Pipe (|)", "|")
+        self.split_delimiter.addItem("Space (␠)", " ")
+        self.split_delimiter.addItem("Custom…", "__custom__")
+        self.split_delimiter.setCurrentIndex(0)
         
         self.apply_split_btn = QPushButton("Split")
         self.apply_split_btn.setProperty("cssClass", "primary")
@@ -460,10 +482,11 @@ class PreprocessingPanel(QWidget):
         # New tool connections
         self.apply_rounding_btn.clicked.connect(self.handle_rounding_click)
         self.apply_split_btn.clicked.connect(self.handle_split_click)
+        self.split_delimiter.currentIndexChanged.connect(self._on_split_delimiter_changed)
         self.apply_unpivot_btn.clicked.connect(self.handle_unpivot_click)
         self.apply_groupby_btn.clicked.connect(self.handle_groupby_click)
         
-        # Apply Changes button
+        # Apply Changes button (promotes Editing View -> Main View)
         self.apply_changes_btn.clicked.connect(self.apply_changes_to_main_view)
         
         # Outlier detection
@@ -666,11 +689,7 @@ class PreprocessingPanel(QWidget):
             
             progress.setValue(80)
             
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
+            self._commit_edit(df)
             
             progress.setValue(100)
             modal.show_info(self, "Success", 
@@ -742,11 +761,7 @@ class PreprocessingPanel(QWidget):
                                   "The filter returned no results. Please try a different filter.")
                 return
                 
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
+            self._commit_edit(df)
             
             modal.show_info(self, "Success", 
                                   "Filter applied successfully! Click 'Apply Changes to Main View' to update the main data preview.")
@@ -826,11 +841,7 @@ class PreprocessingPanel(QWidget):
                     # Use pandas replace for non-exact matches
                     df = df.replace(find_value, replace_value)
                 
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
+            self._commit_edit(df)
             
             modal.show_info(self, "Success", 
                                   "Replace operation completed successfully! Click 'Apply Changes to Main View' to update the main data preview.")
@@ -955,11 +966,7 @@ class PreprocessingPanel(QWidget):
             
             self.save_state()
             
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
+            self._commit_edit(df)
             
             modal.show_info(self, "Success", 
                                   f"Column '{old_name}' renamed to '{new_name}' successfully! Click 'Apply Changes to Main View' to update the main data preview.")
@@ -975,11 +982,7 @@ class PreprocessingPanel(QWidget):
             
             self.save_state()
             
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
+            self._commit_edit(df)
             
             modal.show_info(self, "Success", 
                                   f"Column '{column_name}' removed successfully! Click 'Apply Changes to Main View' to update the main data preview.")
@@ -1478,45 +1481,9 @@ class PreprocessingPanel(QWidget):
 
     def apply_changes_to_main_view(self):
         """Apply the changes made in the Transform tab to the main data preview."""
-        if self.data_manager.data is None:
-            return
-        
-        try:
-            # Save current state for undo functionality
-            self.save_state()
-            
-            # Get the current data from the data manager
-            df = self.data_manager.data.copy()
-            
-            # Create a progress dialog
-            progress = QProgressDialog("Applying changes to main view...", "Cancel", 0, 100, self)
-            progress.setWindowModality(Qt.WindowModality.WindowModal)
-            progress.show()
-            progress.setValue(10)
-            
-            # Update the data manager with the current dataframe
-            self.data_manager._data = df
-            
-            progress.setValue(50)
-            
-            # Emit the data_loaded signal to update all panels
-            self.data_manager.data_loaded.emit(df)
-            
-            progress.setValue(100)
-
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            self.data_manager.save_workspace_data() # Autosave changes
-
-            # Update only the local view without emitting data_loaded signal
-            # Show success message
-            modal.show_info(self, "Success", "Changes applied to main view successfully!")
-
-        except Exception as e:
-            modal.show_error(self, "Error", f"Error applying changes: {str(e)}")
-        finally:
-            if 'progress' in locals():
-                progress.close() 
+        # Promotion is handled by WorkspaceView; this panel just requests it.
+        if self.data_manager.data is not None:
+            self.apply_requested.emit()
 
     def handle_rounding_click(self):
         """Handle rounding button click."""
@@ -1546,12 +1513,7 @@ class PreprocessingPanel(QWidget):
             # Apply rounding
             df[column] = df[column].round(digits)
             
-            # Update the data manager with the new dataframe
-            self.data_manager._data = df
-            
-            # Update only the local view without emitting data_loaded signal
-            self.update_data_view()
-            self.data_manager.save_workspace_data()  # Autosave changes
+            self._commit_edit(df)
 
             modal.show_info(self, "Success",
                                   f"Column '{column}' rounded to {digits} decimal places successfully! "
@@ -1566,7 +1528,7 @@ class PreprocessingPanel(QWidget):
             return
             
         column = self.split_column.currentText()
-        delimiter = self.split_delimiter.text()
+        delimiter = self._get_selected_split_delimiter()
         
         if not column:
             modal.show_warning(self, "Missing Information", 
@@ -1608,12 +1570,7 @@ class PreprocessingPanel(QWidget):
                     df[new_col] = split_df[new_col]
                 
                 progress.setValue(90)
-                
-                # Update the data manager with the new dataframe
-                self.data_manager._data = df
-                
-                # Update only the local view without emitting data_loaded signal
-                self.update_data_view()
+                self._commit_edit(df)
                 
                 progress.setValue(100)
                 
@@ -1630,6 +1587,34 @@ class PreprocessingPanel(QWidget):
         finally:
             if 'progress' in locals():
                 progress.close()
+
+    def _get_selected_split_delimiter(self):
+        """Return the delimiter string chosen in the dropdown."""
+        data = self.split_delimiter.currentData()
+        if data == "__custom__":
+            return self._custom_split_delimiter or ""
+        return data or ""
+
+    def _on_split_delimiter_changed(self, _index):
+        """Handle delimiter dropdown changes (Custom… prompts for input)."""
+        if self.split_delimiter.currentData() != "__custom__":
+            return
+
+        value, ok = QInputDialog.getText(
+            self,
+            "Custom Delimiter",
+            "Enter the delimiter to split on:",
+            text=self._custom_split_delimiter or "",
+        )
+        if not ok:
+            # Revert to comma by default if the user cancels.
+            self.split_delimiter.blockSignals(True)
+            self.split_delimiter.setCurrentIndex(0)
+            self.split_delimiter.blockSignals(False)
+            return
+
+        self._custom_split_delimiter = value
+        # Keep the current selection on "Custom…" (data stays __custom__).
 
     def handle_unpivot_click(self):
         """Handle unpivot columns button click."""
@@ -1806,11 +1791,12 @@ class PreprocessingPanel(QWidget):
                 elif action == "Backward Fill":
                     df[col] = df[col].bfill()
 
-            self.data_manager._data = df
-            self.update_data_view()
-            self.data_manager.data_loaded.emit(df)
-            self.data_modified.emit()
-            modal.show_info(self, "Success", f"Missing values handled using '{action}'.")
+            self._commit_edit(df)
+            modal.show_info(
+                self,
+                "Success",
+                f"Missing values handled using '{action}'. Click 'Apply Changes to Main View' to update the main data preview.",
+            )
 
         except Exception as e:
             self.undo()
@@ -1838,11 +1824,12 @@ class PreprocessingPanel(QWidget):
             final_count = len(df)
             removed = initial_count - final_count
 
-            self.data_manager._data = df
-            self.update_data_view()
-            self.data_manager.data_loaded.emit(df)
-            self.data_modified.emit()
-            modal.show_info(self, "Success", f"Removed {removed} duplicate rows.")
+            self._commit_edit(df)
+            modal.show_info(
+                self,
+                "Success",
+                f"Removed {removed} duplicate rows. Click 'Apply Changes to Main View' to update the main data preview.",
+            )
 
         except Exception as e:
             self.undo()

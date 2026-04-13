@@ -13,6 +13,7 @@ from .components.workspace_view import WorkspaceView
 from .components import modal
 from .theme import apply_theme
 from .dwm_helper import apply_modern_window_style, update_dwm_theme
+from .resource_utils import resource_path
 import ctypes
 import ctypes.wintypes
 import json
@@ -82,9 +83,7 @@ class NativeTitleBar(QWidget):
 
         # Logo — large and prominent
         self.logo_label = QLabel()
-        logo_path = main_window._resource_path(
-            os.path.join('assets', 'DataLens_Logo_cropped.png')
-        )
+        logo_path = resource_path("assets", "DataLens_Logo_cropped.png")
         if os.path.exists(logo_path):
             pixmap = QPixmap(logo_path)
             scaled = pixmap.scaledToHeight(30, Qt.SmoothTransformation)
@@ -208,24 +207,13 @@ class MainWindow(QMainWindow):
         value = self._settings.value("theme", "dark")
         return value if value in ("dark", "light") else "dark"
 
-    def _resource_path(self, relative_path):
-        """
-        Get absolute path to resource, works for dev and PyInstaller.
-        """
-        try:
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-        return os.path.join(base_path, relative_path)
-
     def init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("DataLens")
         self.setMinimumSize(1200, 800)
 
         # Set icon explicitly on this window (supplements QApplication icon)
-        icon_path = self._resource_path(os.path.join('assets', 'DataLens_Logo.ico'))
+        icon_path = resource_path("assets", "DataLens_Logo.ico")
         if os.path.exists(icon_path):
             icon = QIcon(icon_path)
             self.setWindowIcon(icon)

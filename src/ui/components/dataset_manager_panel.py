@@ -146,7 +146,8 @@ class OriginalCard(QWidget):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: {c['border_subtle']};
+                /* In light theme, border_subtle is too faint for hover feedback. */
+                background: {c['bg_hover']};
                 color: {c['text_primary']};
             }}
         """)
@@ -296,7 +297,8 @@ class CopyCard(QWidget):
                 min-height: 0px;
             }}
             QPushButton:hover {{
-                background: {c['border_subtle']};
+                /* In light theme, border_subtle is too faint for hover feedback. */
+                background: {c['bg_hover']};
                 color: {c['text_primary']};
             }}
         """)
@@ -311,7 +313,9 @@ class CopyCard(QWidget):
 
         if self.is_active or self.missing:
             load_action.setEnabled(False)
-        if self.is_active:
+        # Renaming the active working copy is safe: DataManager.rename_copy()
+        # updates active_working_copy so future saves go to the new filename.
+        if self.missing:
             rename_action.setEnabled(False)
 
         action = menu.exec(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
@@ -1057,10 +1061,6 @@ class DatasetManagerDialog(QDialog):
         self.refresh()
 
     def _on_rename_copy(self, copy_rel_path):
-        if copy_rel_path == self.current_dataset:
-            modal.show_warning(self, "Cannot Rename", "The currently active dataset cannot be renamed.")
-            return
-
         old_basename = os.path.basename(copy_rel_path)
         name_without_ext = os.path.splitext(old_basename)[0]
         new_name, ok = QInputDialog.getText(
@@ -1077,7 +1077,10 @@ class DatasetManagerDialog(QDialog):
             return
 
         if self.data_manager.rename_copy(copy_rel_path, new_name):
-            self.dataset_renamed.emit(copy_rel_path, f"copies/{new_name}")
+            new_rel = f"copies/{new_name}"
+            self.dataset_renamed.emit(copy_rel_path, new_rel)
+            if copy_rel_path == self.current_dataset:
+                self.current_dataset = new_rel
             self.refresh()
 
     def _on_delete_copy(self, copy_rel_path):

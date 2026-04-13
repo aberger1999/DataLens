@@ -83,6 +83,10 @@ class AnalysisPanel(QWidget):
         self.results_table.setHorizontalHeaderLabels(["Statistic", "Value"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
         self.results_table.setAlternatingRowColors(True)
+        # Statistics are UI output, not an editable dataset.
+        self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.results_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         stats_layout.addWidget(self.results_table)
 

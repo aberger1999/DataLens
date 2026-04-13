@@ -13,6 +13,11 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QLibraryInfo, Qt
 from PyQt5.QtGui import QPalette, QColor, QIcon
 from ui.main_window import MainWindow
+from ui.resource_utils import resource_path
+from ui.logging_utils import init_logging, get_logger
+
+
+logger = get_logger(__name__)
 
 
 def _ensure_ico(assets_dir):
@@ -38,7 +43,7 @@ def _ensure_ico(assets_dir):
         square.save(ico_path, format='ICO',
                     sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
     except Exception:
-        pass
+        logger.exception("Failed to generate .ico at %s", ico_path)
 
     return ico_path if os.path.exists(ico_path) else None
 
@@ -65,37 +70,20 @@ def _ensure_cropped_logo(assets_dir):
             padded.paste(cropped, (4, 4))
             padded.save(dst)
     except Exception:
-        pass
+        logger.exception("Failed to generate cropped logo at %s", dst)
 
-
-def resource_path(relative_path):
-    """
-    Get absolute path to resource, works for dev and PyInstaller.
-    
-    Args:
-        relative_path: Path relative to the project root
-        
-    Returns:
-        Absolute path to the resource
-    """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        # Development mode - use the project root directory
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-    return os.path.join(base_path, relative_path)
 
 def main():
     """Initialize and run the application."""
+    log_path = init_logging()
+    logger.info("Starting DataLens (log: %s)", log_path)
     # Step 1: Set AppUserModelID BEFORE QApplication (critical for Windows taskbar icon)
     if platform.system() == 'Windows':
         try:
             from ctypes import windll
             windll.shell32.SetCurrentProcessExplicitAppUserModelID('DataLens.App.1.0')
         except Exception:
-            pass
+            logger.exception("Failed to set AppUserModelID")
 
         # Fix DLL loading issue with Anaconda Python
         venv_scripts = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'venv', 'Scripts')
@@ -107,10 +95,22 @@ def main():
     plugins_path = QLibraryInfo.location(QLibraryInfo.PluginsPath)
     os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = plugins_path
 
-    # Step 2: Generate/refresh the .ico and cropped logo from PNG sources
-    assets_dir = resource_path('assets')
-    ico_path = _ensure_ico(assets_dir)
-    _ensure_cropped_logo(assets_dir)
+    # Step 2: Locate the packaged icon.
+    # NOTE: Desktop/start-menu icons come from the EXE's embedded icon
+    # (set by PyInstaller at build time). Runtime regeneration does not
+    # affect shortcut icons, and frozen builds cannot reliably write into
+    # the PyInstaller extraction directory (sys._MEIPASS).
+    ico_path = resource_path("assets", "DataLens_Logo.ico")
+
+    # In development only, regenerate derived assets to keep them in sync.
+    if not getattr(sys, "frozen", False):
+        assets_dir = resource_path("assets")
+        generated_ico = _ensure_ico(assets_dir)
+        if generated_ico:
+            ico_path = generated_ico
+        _ensure_cropped_logo(assets_dir)
+    elif not os.path.exists(ico_path):
+        logger.warning("Bundled icon not found at %s", ico_path)
 
     # Step 3: Create QApplication
     app = QApplication(sys.argv)

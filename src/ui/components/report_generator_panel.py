@@ -29,10 +29,13 @@ import seaborn as sns
 import jinja2
 from ..theme import apply_dark_theme
 from ui.theme import get_colors, current_theme
+from ui.resource_utils import resource_path
+from ui.logging_utils import get_logger
 import os
 import tempfile
 import base64
 
+logger = get_logger(__name__)
 try:
     from weasyprint import HTML
     WEASYPRINT_AVAILABLE = True
@@ -304,9 +307,7 @@ class ReportGeneratorPanel(QWidget):
         self.data_manager = data_manager
         self.workspace_path = None
 
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))))
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = resource_path("templates")
         self.template_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir)
         )
@@ -1039,7 +1040,8 @@ class ReportGeneratorPanel(QWidget):
             self.preview_edit.setHtml(html_content)
             self._apply_preview_card_style()
         except Exception:
-            pass  # silently ignore render errors during live updates
+            # Keep UI responsive (live style tweaks) but log the failure for diagnosis.
+            logger.exception("Report live re-render failed")
 
     def generate_preview(self):
         """Generate report preview."""

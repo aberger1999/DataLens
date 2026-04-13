@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from ..theme import get_colors, current_theme, RADIUS_LG, RADIUS_MD, RADIUS_SM
 from . import modal
+from ..resource_utils import resource_path
 import os
 import sys
 import json
@@ -724,7 +725,12 @@ class HomeScreen(QWidget):
 
         if not os.path.exists(workspace_path):
             os.makedirs(workspace_path)
-            os.makedirs(os.path.join(workspace_path, "data"))
+            # DataLens uses a two-tier dataset model:
+            # - data/originals/ holds imported source datasets (never edited)
+            # - data/copies/ holds working copies (safe to modify)
+            data_dir = os.path.join(workspace_path, "data")
+            os.makedirs(os.path.join(data_dir, "originals"))
+            os.makedirs(os.path.join(data_dir, "copies"))
             os.makedirs(os.path.join(workspace_path, "graphs"))
             os.makedirs(os.path.join(workspace_path, "reports"))
 
@@ -740,6 +746,23 @@ class HomeScreen(QWidget):
 
             with open(os.path.join(workspace_path, "metadata.json"), 'w') as f:
                 json.dump(metadata, f, indent=4)
+
+    @staticmethod
+    def _safe_count_files(folder_path, predicate=None):
+        """Count files in a folder; returns 0 if folder is missing."""
+        try:
+            names = os.listdir(folder_path)
+        except OSError:
+            return 0
+
+        count = 0
+        for name in names:
+            fp = os.path.join(folder_path, name)
+            if not os.path.isfile(fp):
+                continue
+            if predicate is None or predicate(name):
+                count += 1
+        return count
 
     def _handle_remove_readonly(self, func, path, exc_info):
         import stat
@@ -772,13 +795,7 @@ class HomeScreen(QWidget):
         title_row.setContentsMargins(0, 0, 0, 0)
 
         # Logo inline with title
-        import sys
-        try:
-            logo_base = sys._MEIPASS
-        except Exception:
-            logo_base = os.path.dirname(os.path.dirname(os.path.dirname(
-                os.path.dirname(os.path.abspath(__file__)))))
-        logo_path = os.path.join(logo_base, 'assets', 'DataLens_Logo_cropped.png')
+        logo_path = resource_path("assets", "DataLens_Logo_cropped.png")
         if os.path.exists(logo_path):
             from PyQt5.QtGui import QPixmap
             logo_label = QLabel()
@@ -935,9 +952,24 @@ class HomeScreen(QWidget):
                 with open(metadata_path, 'r') as f:
                     metadata = json.load(f)
 
-                metadata['file_count'] = len([f for f in os.listdir(os.path.join(workspace_path, "data")) if os.path.isfile(os.path.join(workspace_path, "data", f))])
-                metadata['graph_count'] = len([f for f in os.listdir(os.path.join(workspace_path, "graphs")) if f.endswith('.png')])
-                metadata['report_count'] = len([f for f in os.listdir(os.path.join(workspace_path, "reports")) if f.endswith(('.html', '.pdf'))])
+                data_dir = os.path.join(workspace_path, "data")
+                originals_dir = os.path.join(data_dir, "originals")
+                copies_dir = os.path.join(data_dir, "copies")
+
+                # Datasets: count CSVs across both tiers.
+                metadata['file_count'] = (
+                    self._safe_count_files(originals_dir, lambda n: n.lower().endswith(".csv"))
+                    + self._safe_count_files(copies_dir, lambda n: n.lower().endswith(".csv"))
+                )
+
+                metadata['graph_count'] = self._safe_count_files(
+                    os.path.join(workspace_path, "graphs"),
+                    lambda n: n.lower().endswith(".png"),
+                )
+                metadata['report_count'] = self._safe_count_files(
+                    os.path.join(workspace_path, "reports"),
+                    lambda n: n.lower().endswith((".html", ".pdf")),
+                )
 
                 self.workspaces.append(metadata)
 

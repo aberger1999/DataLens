@@ -10,6 +10,10 @@ import pandas as pd
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from scipy import stats
+from .logging_utils import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def sanitize_basename(name: str) -> str:
@@ -209,7 +213,7 @@ class DataManager(QObject):
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=4)
         except Exception:
-            pass
+            logger.exception("Failed to rewrite migrated metadata.json at %s", metadata_path)
 
     # ── Working-copy naming ────────────────────────────────────────────────
 
@@ -234,7 +238,7 @@ class DataManager(QObject):
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=4)
         except Exception:
-            pass
+            logger.exception("Failed to update metadata.json at %s", metadata_path)
 
     def _load_originals_from_metadata(self):
         """Load the originals map from metadata.json."""
@@ -535,11 +539,17 @@ class DataManager(QObject):
 
         os.rename(old_abs, new_abs)
 
-        for orig, info in self._originals.items():
+        # Update tracking robustly:
+        # - Some older metadata stored copy entries as bare basenames ("file_1.csv")
+        #   instead of "copies/file_1.csv". Match by basename to preserve the parent
+        #   original association across renames.
+        old_basename = os.path.basename(old_rel)
+        for _orig, info in self._originals.items():
             copies = info.get('copies', [])
-            if old_rel in copies:
-                copies[copies.index(old_rel)] = new_rel
-                break
+            for i, entry in enumerate(list(copies)):
+                if entry == old_rel or os.path.basename(entry) == old_basename:
+                    copies[i] = new_rel
+                    break
 
         if self._active_working_copy == old_rel:
             self._active_working_copy = new_rel
@@ -579,7 +589,7 @@ class DataManager(QObject):
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=4)
         except Exception:
-            pass
+            logger.exception("Failed to reset metadata.json at %s", metadata_path)
 
         self.data_loaded.emit(pd.DataFrame())
 
@@ -687,7 +697,7 @@ class DataManager(QObject):
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 self._data.to_csv(path, index=False)
             except Exception as e:
-                print(f"Failed to autosave workspace data: {e}")
+                logger.exception("Failed to save workspace data to %s", self._active_working_copy)
 
     def load_workspace_data(self):
         """Load data from the workspace's active working copy.
@@ -712,7 +722,7 @@ class DataManager(QObject):
                 metadata = json.load(f)
             target = metadata.get('active_working_copy')
         except Exception:
-            pass
+            logger.exception("Failed to read metadata.json at %s", metadata_path)
 
         # If metadata has an active copy, try to load it
         if target:
@@ -740,41 +750,6 @@ class DataManager(QObject):
                 self.data_error.emit(f"Error loading workspace data: {str(e)}")
 
         return False
-
-    def get_basic_stats(self, column_name):
-        """
-        Calculate basic statistics for a column.
-
-        Args:
-            column_name (str): Name of the column to analyze
-
-        Returns:
-            dict: Dictionary containing basic statistics
-        """
-        if self._data is None or column_name not in self._data.columns:
-            return None
-
-        series = self._data[column_name]
-
-        # Handle numeric data
-        if pd.api.types.is_numeric_dtype(series):
-            return {
-                'count': len(series),
-                'mean': series.mean(),
-                'std': series.std(),
-                'min': series.min(),
-                'max': series.max(),
-                'median': series.median(),
-                'missing': series.isna().sum()
-            }
-
-        # Handle categorical/text data
-        return {
-            'count': len(series),
-            'unique_values': series.nunique(),
-            'most_common': series.mode().iloc[0] if not series.empty else None,
-            'missing': series.isna().sum()
-        }
 
     def get_correlation_analysis(self, column_name):
         """

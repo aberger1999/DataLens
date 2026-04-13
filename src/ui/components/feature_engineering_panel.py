@@ -19,6 +19,10 @@ from datetime import datetime
 
 from ui.theme import get_colors, current_theme
 from ui.components import modal
+from ui.logging_utils import get_logger
+
+
+logger = get_logger(__name__)
 
 
 # ── Shared styling helpers ─────────────────────────────────────────────────
@@ -212,6 +216,10 @@ class ChipSelector(QWidget):
             btn = QPushButton(name)
             btn.setCursor(QCursor(Qt.PointingHandCursor))
             btn.setStyleSheet(_chip_style(False))
+            # Make chips expand to fill the available grid cell width.
+            # This keeps the layout readable when there are many columns.
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            btn.setMinimumWidth(0)
             btn.clicked.connect(lambda checked, n=name: self._on_chip_clicked(n))
             row, col = divmod(i, self._columns)
             self._layout.addWidget(btn, row, col)
@@ -1276,6 +1284,7 @@ class FeatureEngineeringPanel(QWidget):
 
         except Exception:
             self._combine_preview_label.setText("Cannot preview with current selection")
+            logger.exception("Failed to build combination preview (method=%s, cols=%s)", method, cols)
 
     def update_combination_columns_table(self):
         """Legacy compat — now updates chip selector instead."""

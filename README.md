@@ -6,15 +6,26 @@ A modern desktop data analysis application built with PyQt5. Features a workspac
 
 - **Workspace Management**: Create and manage multiple project workspaces from a home screen
 - **Data Import/Export**: Support for CSV, Excel, and other common data formats
-- **Dataset Manager**: Import, load, rename, and delete datasets within a workspace
+- **Dataset Manager (Originals + Working Copies)**: Import datasets as **originals**, automatically create **working copies**, then load / rename / delete datasets inside a workspace
 - **Data Preprocessing**: Clean and transform data with built-in tools
 - **Feature Engineering**: Create new features, encode categoricals, and extract datetime components
-- **Data Visualization**: Interactive charts and plots using Matplotlib and Seaborn
+- **Data Visualization**: Interactive charts and plots using Matplotlib and Seaborn (controls stay usable via scrollable panels)
 - **Statistical Analysis**: Comprehensive statistical tools powered by SciPy
 - **Machine Learning**: Built-in ML capabilities using scikit-learn
 - **Report Generation**: Generate PDF and HTML reports from your analysis
 - **Dark & Light Themes**: Modern UI with theme switching support
 - **Unsaved Changes Protection**: Confirmation dialogs prevent accidental data loss
+- **Two-Pane Workflow (Main vs Editing View)**: Make changes safely in the **Editing View**, then **Apply Changes to Main View** when you’re ready (or **Reset Editing View** to discard pending edits)
+- **At-a-glance active dataset**: The workspace header shows the currently loaded dataset as `Original | Copy` (or `Original`)
+
+## How the workspace workflow works
+
+DataLens keeps your work safe by separating the **Main View** (what gets saved) from the **Editing View** (your draft edits):
+
+- **Main View (left)**: Data preview of the currently loaded dataset. This is the source of truth for exports and workspace saves.
+- **Editing View (right)**: Tabbed tools (Preprocessing, Analysis, Visualization, Feature Engineering, etc.). Changes here are considered **pending edits** until applied.
+- **Apply Changes to Main View**: Promotes the Editing View dataset into the Main View and marks the workspace as having unsaved changes.
+- **Reset Editing View**: Reverts the Editing View back to the current Main View dataset (discarding pending edits).
 
 ## System Requirements
 
@@ -73,17 +84,22 @@ python src/main.py
 pip install -r requirements.txt
 ```
 
-2. Build the executable with PyInstaller:
+2. Regenerate the Windows icon (ensures the desktop icon isn't tiny):
+```bash
+python tools/generate_windows_icon.py
+```
+
+3. Build the executable with PyInstaller:
 ```bash
 pyinstaller DataLens.spec --clean --noconfirm
 ```
 
-3. Create the Windows installer:
+4. Create the Windows installer:
 ```bash
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ```
 
-4. The installer will be created at `installer_output/DataLens_1.0_Setup.exe`
+5. The installer will be created at `installer_output/DataLens_1.0_Setup.exe`
 
 ### Portable Version (No Installer)
 

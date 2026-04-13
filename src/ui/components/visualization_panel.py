@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QDialog, QApplication
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QPixmap, QPainter, QIcon
+from PyQt5.QtGui import QColor, QPixmap, QPainter, QIcon, QShowEvent, QResizeEvent
 import matplotlib
 matplotlib.use('Qt5Agg')  # Set the backend before importing pyplot
 import matplotlib.pyplot as plt
@@ -24,6 +24,10 @@ import pandas as pd
 from scipy import stats
 import os
 from ..theme import apply_dark_theme, apply_chart_theme, current_theme, get_colors
+from ..logging_utils import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class _StyledSplitterHandle(QWidget):
@@ -1036,7 +1040,8 @@ class VisualizationPanel(QWidget):
         self.workspace_path = None
 
         # Set up matplotlib figure
-        plt.style.use('seaborn-v0_8')  # Use a more specific style name
+        # Default plot style should be "default" unless the user chooses otherwise.
+        plt.style.use('default')
         self.figure = Figure(figsize=(10, 8), dpi=100)  # Increased figure size
         self.canvas = FigureCanvas(self.figure)
 
@@ -1086,19 +1091,20 @@ class VisualizationPanel(QWidget):
         """)
 
         # -- Controls panel inside a scroll area so it stays usable when small --
-        controls_scroll = QScrollArea()
-        controls_scroll.setWidgetResizable(True)
-        controls_scroll.setMinimumHeight(36)          # can shrink almost all the way
-        controls_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.controls_scroll = QScrollArea()
+        self.controls_scroll.setWidgetResizable(True)
+        self.controls_scroll.setMinimumHeight(36)          # can shrink almost all the way
+        self.controls_scroll.setFrameShape(QFrame.Shape.NoFrame)
 
         controls_container = QWidget()
-        controls_scroll.setWidget(controls_container)
-        controls_tabs = QTabWidget(controls_container)
-        controls_tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.controls_scroll.setWidget(controls_container)
+        self.controls_tabs = QTabWidget(controls_container)
+        self.controls_tabs.setTabPosition(QTabWidget.TabPosition.North)
 
         # Data Selection Tab
         data_tab = QWidget()
         data_layout = QGridLayout(data_tab)
+        # Match the Style tab: use the same default grid spacing/margins as other tabs.
 
         # Chart type selector
         chart_label = QLabel("Chart Type:")
@@ -1154,7 +1160,7 @@ class VisualizationPanel(QWidget):
         data_layout.addWidget(series_label, 5, 0)
         data_layout.addWidget(self.series_list, 5, 1)
 
-        controls_tabs.addTab(data_tab, "Data Selection")
+        self.controls_tabs.addTab(data_tab, "Data Selection")
 
         # Style Tab
         style_tab = QWidget()
@@ -1178,6 +1184,7 @@ class VisualizationPanel(QWidget):
             "default",
             "dark_background"
         ])
+        self.style_combo.setCurrentText("default")
         style_layout.addWidget(style_label, 1, 0)
         style_layout.addWidget(self.style_combo, 1, 1)
 
@@ -1193,6 +1200,7 @@ class VisualizationPanel(QWidget):
             "Cividis",
             "Custom"
         ])
+        self.color_combo.setCurrentText("Default")
         style_layout.addWidget(color_theme_label, 2, 0)
         style_layout.addWidget(self.color_combo, 2, 1)
 
@@ -1268,7 +1276,7 @@ class VisualizationPanel(QWidget):
 
         style_layout.addWidget(options_group, 6, 0, 1, 2)
 
-        controls_tabs.addTab(style_tab, "Style")
+        self.controls_tabs.addTab(style_tab, "Style")
 
         # Advanced Tab - use a scroll area for all the options
         advanced_tab = QWidget()
@@ -1363,6 +1371,9 @@ class VisualizationPanel(QWidget):
         self.alpha_slider = QSlider(Qt.Orientation.Horizontal)
         self.alpha_slider.setRange(10, 100)
         self.alpha_slider.setValue(80)
+        # The global slider handle uses a negative vertical margin which can
+        # get clipped in tight grid rows. Give this slider a bit more height.
+        self.alpha_slider.setMinimumHeight(26)
         appearance_layout.addWidget(alpha_label, 0, 0)
         appearance_layout.addWidget(self.alpha_slider, 0, 1)
 
@@ -1435,17 +1446,17 @@ class VisualizationPanel(QWidget):
 
         advanced_layout.addWidget(export_group, row, 0, 1, 2)
 
-        controls_tabs.addTab(advanced_scroll, "Advanced")
+        self.controls_tabs.addTab(advanced_scroll, "Advanced")
 
         # Set up tab container layout
         controls_container_layout = QVBoxLayout(controls_container)
-        controls_container_layout.addWidget(controls_tabs)
+        controls_container_layout.addWidget(self.controls_tabs)
         controls_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # Preview area with matplotlib canvas
-        preview_container = QWidget()
-        preview_container.setMinimumHeight(150)
-        preview_layout = QVBoxLayout(preview_container)
+        self.preview_container = QWidget()
+        self.preview_container.setMinimumHeight(150)
+        preview_layout = QVBoxLayout(self.preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(0)
 
@@ -1489,11 +1500,15 @@ class VisualizationPanel(QWidget):
         preview_layout.addWidget(canvas_frame, stretch=1)
 
         # Add widgets to splitter and set initial sizes
-        self.splitter.addWidget(controls_scroll)
-        self.splitter.addWidget(preview_container)
+        self.splitter.addWidget(self.controls_scroll)
+        self.splitter.addWidget(self.preview_container)
 
-        # Set initial splitter sizes (30% controls, 70% chart)
+        # Initial splitter sizes; refined on show/tab changes to match content height.
         self.splitter.setSizes([300, 700])
+
+        # Track user adjustments to the controls/chart splitter vs our auto-fit.
+        self._viz_split_user_touched = False
+        self._viz_split_sync_in_progress = False
 
         # Paint grip dots on the splitter handle
         handle = self.splitter.handle(1)
@@ -1508,9 +1523,112 @@ class VisualizationPanel(QWidget):
 
         main_layout.addWidget(self.splitter)
 
+    # ── Visualization controls / chart splitter auto-fit ───────────────────
+
+    def showEvent(self, event: QShowEvent):
+        super().showEvent(event)
+        # First real layout pass: size hints are stable enough to fit the splitter.
+        self._schedule_sync_viz_controls_split()
+
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        # Width changes can change wrapped control heights; keep the top pane snug
+        # unless the user has manually positioned the splitter.
+        self._schedule_sync_viz_controls_split()
+
+    def _schedule_sync_viz_controls_split(self):
+        """Coalesce splitter sync work to the end of the event loop."""
+        if not hasattr(self, "splitter"):
+            return
+        QTimer.singleShot(0, self._sync_viz_controls_split_to_content)
+
+    def _on_viz_splitter_moved(self, pos, index):
+        # Any direct manipulation of the splitter should disable auto-fit.
+        _ = (pos, index)
+        if self._viz_split_sync_in_progress:
+            return
+        self._viz_split_user_touched = True
+
+    def _on_controls_tab_changed(self, _index: int):
+        # Switching tabs changes how much vertical space the controls need.
+        # Each tab gets a fresh auto-fit pass unless the user is actively dragging
+        # the splitter on the *current* tab (handled via `_viz_split_user_touched`).
+        self._viz_split_user_touched = False
+        self._schedule_sync_viz_controls_split()
+
+    def _viz_preferred_controls_height(self) -> int:
+        """Best-effort preferred height for the controls scroll area (current tab)."""
+        if not hasattr(self, "controls_tabs") or self.controls_tabs is None:
+            return 0
+
+        w = self.controls_tabs.currentWidget()
+        if w is None:
+            return 0
+
+        # Ensure geometry-dependent hints are up to date.
+        w.updateGeometry()
+        self.controls_tabs.updateGeometry()
+
+        tab_bar_h = self.controls_tabs.tabBar().sizeHint().height()
+        page_h = w.sizeHint().height()
+
+        # QScrollArea adds a little chrome; keep a small cushion so we don't clip
+        # the bottom row on high-DPI / styled widgets.
+        cushion = 8
+        return max(tab_bar_h + page_h + cushion, 1)
+
+    def _sync_viz_controls_split_to_content(self):
+        """Size the top splitter pane to the controls' natural height (per tab)."""
+        if self._viz_split_sync_in_progress:
+            return
+        if self._viz_split_user_touched:
+            return
+        if not hasattr(self, "splitter") or self.splitter is None:
+            return
+        if not self.isVisible():
+            return
+
+        total = int(self.splitter.height())
+        if total <= 1:
+            return
+
+        handle_h = 0
+        try:
+            handle = self.splitter.handle(1)
+            if handle is not None:
+                handle_h = int(handle.height())
+        except Exception:
+            handle_h = 0
+
+        avail = max(total - handle_h, 1)
+
+        preview_min = int(self.preview_container.minimumSizeHint().height())
+        controls_min = int(self.controls_scroll.minimumSizeHint().height())
+
+        want_top = self._viz_preferred_controls_height()
+        want_top = max(want_top, controls_min)
+
+        # Never steal so much space that the chart can't meet its minimum.
+        max_top = max(avail - preview_min, controls_min)
+        top = min(want_top, max_top)
+        bottom = max(avail - top, preview_min)
+
+        sizes = [top, bottom]
+        if sizes == list(self.splitter.sizes()):
+            return
+
+        self._viz_split_sync_in_progress = True
+        try:
+            self.splitter.setSizes(sizes)
+        finally:
+            self._viz_split_sync_in_progress = False
+
     def setup_connections(self):
         """Setup signal connections."""
         self.data_manager.data_loaded.connect(self.on_data_loaded)
+        self.splitter.splitterMoved.connect(self._on_viz_splitter_moved)
+        self.controls_tabs.currentChanged.connect(self._on_controls_tab_changed)
+
         self.chart_combo.currentTextChanged.connect(self.on_chart_type_changed)
         self.x_axis_combo.currentTextChanged.connect(self.schedule_update)
         self.y_axis_combo.currentTextChanged.connect(self.schedule_update)
@@ -1823,6 +1941,7 @@ class VisualizationPanel(QWidget):
             self.x_axis_combo.setEnabled(False)
             self.y_axis_combo.setEnabled(False)
             self.color_by_combo.setEnabled(False)
+            self._schedule_sync_viz_controls_split()
             return
 
         # Get all columns
@@ -1861,6 +1980,9 @@ class VisualizationPanel(QWidget):
         # Apply correct enabled states for the current chart type
         self.on_chart_type_changed(self.chart_combo.currentText())
 
+        # Column lists / enabled widgets can change the controls pane height.
+        self._schedule_sync_viz_controls_split()
+
     def on_series_selection_changed(self):
         """Handle changes in selected series."""
         self.selected_series = [item.text() for item in self.series_list.selectedItems()]
@@ -1890,9 +2012,9 @@ class VisualizationPanel(QWidget):
         if file_path:
             try:
                 self.figure.savefig(file_path, format=format_type, dpi=self.export_dpi_spinbox.value(), bbox_inches='tight')
-                print(f"Plot saved to {file_path}")
+                logger.info("Plot exported: %s", file_path)
             except Exception as e:
-                print(f"Error saving plot: {str(e)}")
+                logger.exception("Error exporting plot to %s", file_path)
 
     def set_workspace_path(self, workspace_path):
         """Set the active workspace path."""
