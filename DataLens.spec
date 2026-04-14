@@ -17,7 +17,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['qt_runtime_hook.py'],
-    excludes=[],
+    excludes=['PyQt6', 'PySide6', 'PySide2'],
     noarchive=False,
     optimize=0,
 )
